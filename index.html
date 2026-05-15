@@ -252,7 +252,7 @@ function checkWallCollision(newX, newY) {
     return false;
 }
 
-// Atualiza a física do jogo a cada frame
+// Atualiza a física do jogo com sistema de auto-alinhamento nas quinas
 function update() {
     if (isGameOver) return;
 
@@ -264,7 +264,39 @@ function update() {
     if (keys.a || keys.arrowleft) dx = -player.speed;
     if (keys.d || keys.arrowright) dx = player.speed;
 
-    // Tenta mover no eixo X e Y separadamente para deslizar suavemente pelas paredes
+    // Se não houver comando de movimento, não faz nada
+    if (dx === 0 && dy === 0) return;
+
+    // --- SISTEMA DE AUTO-ALINHAMENTO (CORNER SLIDING) ---
+    // Descobre em qual célula o centro do jogador está
+    let currentCellC = Math.floor(player.x / CELL_SIZE);
+    let currentCellR = Math.floor(player.y / CELL_SIZE);
+    
+    // Calcula o centro exato em pixels dessa célula atual
+    let targetCenterX = currentCellC * CELL_SIZE + CELL_SIZE / 2;
+    let targetCenterY = currentCellR * CELL_SIZE + CELL_SIZE / 2;
+
+    // Margem de tolerância: quanto maior, mais agressivo é o "puxão" para o centro do corredor
+    let alignmentThreshold = CELL_SIZE * 0.4; 
+
+    // Se estiver se movendo na HORIZONTAL, alinha automaticamente na VERTICAL
+    if (dx !== 0 && dy === 0) {
+        if (Math.abs(player.y - targetCenterY) < alignmentThreshold) {
+            if (player.y < targetCenterY) player.y += Math.min(1.5, targetCenterY - player.y);
+            else if (player.y > targetCenterY) player.y -= Math.min(1.5, player.y - targetCenterY);
+        }
+    }
+    
+    // Se estiver se movendo na VERTICAL, alinha automaticamente na HORIZONTAL
+    if (dy !== 0 && dx === 0) {
+        if (Math.abs(player.x - targetCenterX) < alignmentThreshold) {
+            if (player.x < targetCenterX) player.x += Math.min(1.5, targetCenterX - player.x);
+            else if (player.x > targetCenterX) player.x -= Math.min(1.5, player.x - targetCenterX);
+        }
+    }
+    // ----------------------------------------------------
+
+    // Tenta mover no eixo X e Y separadamente após o ajuste de alinhamento
     if (dx !== 0 && !checkWallCollision(player.x + dx, player.y)) {
         player.x += dx;
     }
@@ -272,6 +304,12 @@ function update() {
         player.y += dy;
     }
 
+    // Verifica condição de vitória
+    if (currentCellC === goal.x && currentCellR === goal.y) {
+        isGameOver = true;
+        victoryScreen.style.display = 'flex';
+    }
+}
     // Verifica condição de vitória
     let currentCellC = Math.floor(player.x / CELL_SIZE);
     let currentCellR = Math.floor(player.y / CELL_SIZE);
