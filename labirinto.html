@@ -1,0 +1,383 @@
+<html lang="pt-BR"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labirinto Mortal - Nível Difícil</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #ff3333;
+            text-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
+        }
+
+        p {
+            margin-bottom: 20px;
+            color: #aaa;
+        }
+
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            border: 4px solid #333;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .btn-reset {
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-size: 1rem;
+            background-color: #ff3333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-reset:hover {
+            background-color: #cc0000;
+            transform: scale(1.05);
+        }
+
+        .btn-reset:active {
+            transform: scale(0.95);
+        }
+
+        /* Tela de Vitória */
+        #victory-screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #00ff66;
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(0, 255, 102, 0.7);
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Labirinto Impossível</h1>
+    <p>Use as setas do teclado ou WASD para guiar a esfera até o bloco verde.</p>
+
+    <div id="canvas-container">
+        <canvas id="mazeCanvas"></canvas>
+        <div id="victory-screen">
+            <div>VOCÊ ESCAPOU!</div>
+            <button class="btn-reset" onclick="initGame()">Jogar Novamente</button>
+        </div>
+    </div>
+
+    <button class="btn-reset" onclick="initGame()">Gerar Novo Labirinto</button>
+
+    <script>
+       const canvas = document.getElementById('mazeCanvas');
+const ctx = canvas.getContext('2d');
+const victoryScreen = document.getElementById('victory-screen');
+
+// Configurações do Labirinto
+const COLS = 35; 
+const ROWS = 35; 
+const CELL_SIZE = 18; 
+
+canvas.width = COLS * CELL_SIZE;
+canvas.height = ROWS * CELL_SIZE;
+
+let grid = [];
+let stack = [];
+let isGameOver = false;
+
+// Configurações do Jogador (Movimento Suave)
+let player = {
+    x: CELL_SIZE / 2, // Posição em pixels (começa no centro da célula)
+    y: CELL_SIZE / 2,
+    radius: (CELL_SIZE - 6) / 2,
+    speed: 2.5 // Velocidade do movimento (pixels por frame)
+};
+
+let goal = { x: COLS - 1, y: ROWS - 1 };
+
+// Rastreamento de teclas pressionadas
+const keys = {
+    w: false, a: false, s: false, d: false,
+    arrowup: false, arrowleft: false, arrowdown: false, arrowright: false
+};
+
+class Cell {
+    constructor(r, c) {
+        this.r = r;
+        this.c = c;
+        this.walls = [true, true, true, true]; // Topo, Direita, Baixo, Esquerda
+        this.visited = false;
+    }
+
+    checkNeighbors() {
+        let neighbors = [];
+        let top    = grid[index(this.r - 1, this.c)];
+        let right  = grid[index(this.r, this.c + 1)];
+        let bottom = grid[index(this.r + 1, this.c)];
+        let left   = grid[index(this.r, this.c - 1)];
+
+        if (top && !top.visited) neighbors.push(top);
+        if (right && !right.visited) neighbors.push(right);
+        if (bottom && !bottom.visited) neighbors.push(bottom);
+        if (left && !left.visited) neighbors.push(left);
+
+        if (neighbors.length > 0) {
+            return neighbors[Math.floor(Math.random() * neighbors.length)];
+        }
+        return undefined;
+    }
+}
+
+function index(r, c) {
+    if (r < 0 || c < 0 || r > ROWS - 1 || c > COLS - 1) return -1;
+    return c + r * COLS;
+}
+
+function removeWalls(a, b) {
+    let x = a.c - b.c;
+    if (x === 1) { a.walls[3] = false; b.walls[1] = false; }
+    else if (x === -1) { a.walls[1] = false; b.walls[3] = false; }
+    let y = a.r - b.r;
+    if (y === 1) { a.walls[0] = false; b.walls[2] = false; }
+    else if (y === -1) { a.walls[2] = false; b.walls[0] = false; }
+}
+
+function initGame() {
+    grid = [];
+    stack = [];
+    isGameOver = false;
+    victoryScreen.style.display = 'none';
+
+    player.x = CELL_SIZE / 2;
+    player.y = CELL_SIZE / 2;
+
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            grid.push(new Cell(r, c));
+        }
+    }
+
+    let currentCell = grid[0];
+    currentCell.visited = true;
+    
+    while (true) {
+        let next = currentCell.checkNeighbors();
+        if (next) {
+            next.visited = true;
+            stack.push(currentCell);
+            removeWalls(currentCell, next);
+            currentCell = next;
+        } else if (stack.length > 0) {
+            currentCell = stack.pop();
+        } else {
+            break;
+        }
+    }
+}
+
+// Função que checa se uma posição (x, y) colide com as paredes do labirinto
+function checkWallCollision(newX, newY) {
+    const r = player.radius;
+    // Checa 4 pontos ao redor da esfera para garantir que nenhuma borda toque nas paredes
+    const points = [
+        { x: newX - r, y: newY },
+        { x: newX + r, y: newY },
+        { x: newX, y: newY - r },
+        { x: newX, y: newY + r }
+    ];
+
+    for (let p of points) {
+        // Ignora se estiver fora dos limites do mapa (trata como parede)
+        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) return true;
+
+        let cellC = Math.floor(p.x / CELL_SIZE);
+        let cellR = Math.floor(p.y / CELL_SIZE);
+        let cell = grid[index(cellR, cellC)];
+
+        if (!cell) return true;
+
+        // Posição relativa do ponto dentro da célula atual
+        let localX = p.x % CELL_SIZE;
+        let localY = p.y % CELL_SIZE;
+        let buffer = 1; // Pequena folga para evitar travamentos nas quinas
+
+        if (cell.walls[0] && localY < buffer) return true; // Topo
+        if (cell.walls[1] && localX > CELL_SIZE - buffer) return true; // Direita
+        if (cell.walls[2] && localY > CELL_SIZE - buffer) return true; // Baixo
+        if (cell.walls[3] && localX < buffer) return true; // Esquerda
+    }
+    return false;
+}
+
+// Atualiza a física do jogo com sistema de auto-alinhamento nas quinas
+function update() {
+    if (isGameOver) return;
+
+    let dx = 0;
+    let dy = 0;
+
+    if (keys.w || keys.arrowup) dy = -player.speed;
+    if (keys.s || keys.arrowdown) dy = player.speed;
+    if (keys.a || keys.arrowleft) dx = -player.speed;
+    if (keys.d || keys.arrowright) dx = player.speed;
+
+    // Se não houver comando de movimento, não faz nada
+    if (dx === 0 && dy === 0) return;
+
+    // --- SISTEMA DE AUTO-ALINHAMENTO (CORNER SLIDING) ---
+    // Descobre em qual célula o centro do jogador está
+    let currentCellC = Math.floor(player.x / CELL_SIZE);
+    let currentCellR = Math.floor(player.y / CELL_SIZE);
+    
+    // Calcula o centro exato em pixels dessa célula atual
+    let targetCenterX = currentCellC * CELL_SIZE + CELL_SIZE / 2;
+    let targetCenterY = currentCellR * CELL_SIZE + CELL_SIZE / 2;
+
+    // Margem de tolerância: quanto maior, mais agressivo é o "puxão" para o centro do corredor
+    let alignmentThreshold = CELL_SIZE * 0.4; 
+
+    // Se estiver se movendo na HORIZONTAL, alinha automaticamente na VERTICAL
+    if (dx !== 0 && dy === 0) {
+        if (Math.abs(player.y - targetCenterY) < alignmentThreshold) {
+            if (player.y < targetCenterY) player.y += Math.min(1.5, targetCenterY - player.y);
+            else if (player.y > targetCenterY) player.y -= Math.min(1.5, player.y - targetCenterY);
+        }
+    }
+    
+    // Se estiver se movendo na VERTICAL, alinha automaticamente na HORIZONTAL
+    if (dy !== 0 && dx === 0) {
+        if (Math.abs(player.x - targetCenterX) < alignmentThreshold) {
+            if (player.x < targetCenterX) player.x += Math.min(1.5, targetCenterX - player.x);
+            else if (player.x > targetCenterX) player.x -= Math.min(1.5, player.x - targetCenterX);
+        }
+    }
+    // ----------------------------------------------------
+
+    // Tenta mover no eixo X e Y separadamente após o ajuste de alinhamento
+    if (dx !== 0 && !checkWallCollision(player.x + dx, player.y)) {
+        player.x += dx;
+    }
+    if (dy !== 0 && !checkWallCollision(player.x, player.y + dy)) {
+        player.y += dy;
+    }
+
+    // Verifica condição de vitória
+    if (currentCellC === goal.x && currentCellR === goal.y) {
+        isGameOver = true;
+        victoryScreen.style.display = 'flex';
+    }
+}
+    // Verifica condição de vitória
+    let currentCellC = Math.floor(player.x / CELL_SIZE);
+    let currentCellR = Math.floor(player.y / CELL_SIZE);
+    if (currentCellC === goal.x && currentCellR === goal.y) {
+        isGameOver = true;
+        victoryScreen.style.display = 'flex';
+    }
+}
+
+// Renderiza os elementos visuais
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Desenha as paredes
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < grid.length; i++) {
+        let cell = grid[i];
+        let x = cell.c * CELL_SIZE;
+        let y = cell.r * CELL_SIZE;
+
+        if (cell.walls[0]) ctx.strokeRect(x, y, CELL_SIZE, 0);
+        if (cell.walls[1]) ctx.strokeRect(x + CELL_SIZE, y, 0, CELL_SIZE);
+        if (cell.walls[2]) ctx.strokeRect(x, y + CELL_SIZE, CELL_SIZE, 0);
+        if (cell.walls[3]) ctx.strokeRect(x, y, 0, CELL_SIZE);
+    }
+
+    // Desenha a Saída
+    ctx.fillStyle = '#00ff66';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00ff66';
+    ctx.fillRect(goal.x * CELL_SIZE + 4, goal.y * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8);
+
+    // Desenha o Jogador
+    ctx.fillStyle = '#3399ff';
+    ctx.shadowColor = '#3399ff';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.shadowBlur = 0; // Reseta sombra
+}
+
+// Loop principal do jogo rodando a 60 FPS (ou taxa de atualização do monitor)
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Ouvintes de eventos do teclado (Keydown / Keyup)
+window.addEventListener('keydown', (e) => {
+    let key = e.key.toLowerCase();
+    if (key in keys) keys[key] = true;
+    
+    if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(e.key)) {
+        e.preventDefault(); // Evita rolagem da página
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    let key = e.key.toLowerCase();
+    if (key in keys) keys[key] = false;
+});
+
+// Inicialização
+initGame();
+gameLoop();
+</script>
+
+
+</body></html>
