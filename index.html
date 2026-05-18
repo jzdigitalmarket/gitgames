@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labirinto Mortal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #0f0f0f;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        h1 {
+            margin: 15px 0;
+            font-size: 2.5rem;
+            color: #ff3333;
+            text-shadow: 0 0 15px rgba(255, 51, 51, 0.6);
+        }
+        #menu {
+            text-align: center;
+            margin: 20px;
+        }
+        .btn {
+            padding: 12px 30px;
+            margin: 8px;
+            font-size: 1.1rem;
+            background: #ff3333;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #cc0000; transform: scale(1.05); }
+        .btn.easy { background: #33cc33; }
+        .btn.easy:hover { background: #22aa22; }
+        .btn.medium { background: #ffaa00; }
+        .btn.medium:hover { background: #ff8800; }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            border: 5px solid #333;
+            background: #000;
+            display: none;
+        }
+        canvas { display: block; }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            color: #fff;
+            font-size: 1.1rem;
+            text-shadow: 0 0 8px black;
+            pointer-events: none;
+        }
+
+        #victory-screen {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #00ff88;
+            font-size: 2.5rem;
+            text-shadow: 0 0 20px #00ff88;
+        }
+
+        .record { color: #ffd700; font-size: 1.3rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>🏰 LABIRINTO MORTAL</h1>
+
+    <div id="menu">
+        <h2>Escolha a Dificuldade</h2>
+        <button class="btn easy" onclick="startGame(15, 15, 22, 'Fácil')">FÁCIL</button>
+        <button class="btn medium" onclick="startGame(25, 25, 18, 'Médio')">MÉDIO</button>
+        <button class="btn" onclick="startGame(35, 35, 16, 'Expert')">EXPERT</button>
+    </div>
+
+    <div id="game-container">
+        <div id="hud">
+            <div>Dificuldade: <span id="difficulty">---</span></div>
+            <div>Tempo: <span id="timer">00:00</span></div>
+            <div>Recorde: <span id="best-time">0:00</span></div>
+        </div>
+        <canvas id="mazeCanvas"></canvas>
+        
+        <div id="victory-screen">
+            <div>🏆 VOCÊ ESCAPOU!</div>
+            <div class="record" id="victory-time"></div>
+            <button class="btn" onclick="returnToMenu()">Voltar ao Menu</button>
+            <button class="btn" onclick="restartSameLevel()">Jogar Novamente</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        const victoryScreen = document.getElementById('victory-screen');
+
+        let COLS, ROWS, CELL_SIZE, difficultyName;
+        let grid = [], stack = [];
+        let player = { x: 0, y: 0, radius: 0, speed: 2.8 };
+        let goal = { x: 0, y: 0 };
+        let keys = {};
+        let isGameOver = false;
+        let startTime, timerInterval;
+        let bestTimes = JSON.parse(localStorage.getItem('mazeBestTimes')) || {};
+
+        class Cell {
+            constructor(r, c) {
+                this.r = r; this.c = c;
+                this.walls = [true, true, true, true]; // top, right, bottom, left
+                this.visited = false;
+            }
+        }
+
+        function index(r, c) {
+            if (r < 0 || c < 0 || r >= ROWS || c >= COLS) return -1;
+            return c + r * COLS;
+        }
+
+        function removeWalls(a, b) {
+            const x = a.c - b.c;
+            if (x === 1) { a.walls[3] = b.walls[1] = false; }
+            if (x === -1) { a.walls[1] = b.walls[3] = false; }
+            const y = a.r - b.r;
+            if (y === 1) { a.walls[0] = b.walls[2] = false; }
+            if (y === -1) { a.walls[2] = b.walls[0] = false; }
+        }
+
+        function generateMaze() {
+            grid = [];
+            stack = [];
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    grid.push(new Cell(r, c));
+                }
+            }
+
+            let current = grid[0];
+            current.visited = true;
+
+            while (true) {
+                let next = current.checkNeighbors();
+                if (next) {
+                    next.visited = true;
+                    stack.push(current);
+                    removeWalls(current, next);
+                    current = next;
+                } else if (stack.length > 0) {
+                    current = stack.pop();
+                } else break;
+            }
+        }
+
+        Cell.prototype.checkNeighbors = function() {
+            const dirs = [
+                {r: -1, c: 0}, {r: 0, c: 1},
+                {r: 1, c: 0}, {r: 0, c: -1}
+            ];
+            let neighbors = [];
+            for (let d of dirs) {
+                let nr = this.r + d.r, nc = this.c + d.c;
+                let n = grid[index(nr, nc)];
+                if (n && !n.visited) neighbors.push(n);
+            }
+            return neighbors.length ? neighbors[Math.floor(Math.random() * neighbors.length)] : null;
+        };
+
+        function startGame(cols, rows, cellSize, name) {
+            COLS = cols;
+            ROWS = rows;
+            CELL_SIZE = cellSize;
+            difficultyName = name;
+
+            canvas.width = COLS * CELL_SIZE;
+            canvas.height = ROWS * CELL_SIZE;
+
+            player.radius = (CELL_SIZE - 8) / 2;
+            player.speed = difficultyName === 'Expert' ? 3.2 : 2.8;
+
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            document.getElementById('difficulty').textContent = name;
+
+            initLevel();
+        }
+
+        function initLevel() {
+            isGameOver = false;
+            victoryScreen.style.display = 'none';
+            
+            player.x = CELL_SIZE / 2;
+            player.y = CELL_SIZE / 2;
+            goal = { x: COLS - 1, y: ROWS - 1 };
+
+            generateMaze();
+
+            // Expert: algumas paredes vão se fechar
+            if (difficultyName === 'Expert') {
+                setTimeout(closeSomePassages, 8000);
+            }
+
+            startTimer();
+            gameLoop();
+        }
+
+        function closeSomePassages() {
+            if (isGameOver) return;
+            const attempts = 12;
+            for (let i = 0; i < attempts; i++) {
+                const cell = grid[Math.floor(Math.random() * grid.length)];
+                const wall = Math.floor(Math.random() * 4);
+                if (cell.walls[wall]) continue; // já está fechada
+
+                // Fecha só se não for a saída do jogador
+                cell.walls[wall] = true;
+            }
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 100);
+        }
+
+        function updateTimer() {
+            if (isGameOver) return;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const min = Math.floor(elapsed / 60);
+            const sec = elapsed % 60;
+            document.getElementById('timer').textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        function checkWin() {
+            const cellX = Math.floor(player.x / CELL_SIZE);
+            const cellY = Math.floor(player.y / CELL_SIZE);
+            if (cellX === goal.x && cellY === goal.y) {
+                isGameOver = true;
+                clearInterval(timerInterval);
+                
+                const timeEl = document.getElementById('timer').textContent;
+                document.getElementById('victory-time').innerHTML = `Seu tempo: <strong>${timeEl}</strong>`;
+                
+                // Salvar recorde
+                const currentTime = Date.now() - startTime;
+                const key = difficultyName;
+                if (!bestTimes[key] || currentTime < bestTimes[key]) {
+                    bestTimes[key] = currentTime;
+                    localStorage.setItem('mazeBestTimes', JSON.stringify(bestTimes));
+                }
+                
+                document.getElementById('best-time').textContent = formatTime(bestTimes[key]);
+                victoryScreen.style.display = 'flex';
+            }
+        }
+
+        function formatTime(ms) {
+            const sec = Math.floor(ms / 1000);
+            const min = Math.floor(sec / 60);
+            return `${min}:${(sec % 60).toString().padStart(2, '0')}`;
+        }
+
+        function checkWallCollision(newX, newY) {
+            const r = player.radius + 1;
+            const points = [
+                {x: newX - r, y: newY},
+                {x: newX + r, y: newY},
+                {x: newX, y: newY - r},
+                {x: newX, y: newY + r}
+            ];
+
+            for (let p of points) {
+                if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) return true;
+
+                const cellC = Math.floor(p.x / CELL_SIZE);
+                const cellR = Math.floor(p.y / CELL_SIZE);
+                const cell = grid[index(cellR, cellC)];
+                if (!cell) return true;
+
+                const lx = p.x % CELL_SIZE;
+                const ly = p.y % CELL_SIZE;
+                const buffer = 2;
+
+                if (cell.walls[0] && ly < buffer) return true;
+                if (cell.walls[1] && lx > CELL_SIZE - buffer) return true;
+                if (cell.walls[2] && ly > CELL_SIZE - buffer) return true;
+                if (cell.walls[3] && lx < buffer) return true;
+            }
+            return false;
+        }
+
+        function update() {
+            if (isGameOver) return;
+
+            let dx = 0, dy = 0;
+            if (keys['w'] || keys['arrowup']) dy -= player.speed;
+            if (keys['s'] || keys['arrowdown']) dy += player.speed;
+            if (keys['a'] || keys['arrowleft']) dx -= player.speed;
+            if (keys['d'] || keys['arrowright']) dx += player.speed;
+
+            if (dx === 0 && dy === 0) return;
+
+            // Movimento com colisão
+            if (dx !== 0 && !checkWallCollision(player.x + dx, player.y)) player.x += dx;
+            if (dy !== 0 && !checkWallCollision(player.x, player.y + dy)) player.y += dy;
+
+            checkWin();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Paredes
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 3;
+            for (let cell of grid) {
+                const x = cell.c * CELL_SIZE;
+                const y = cell.r * CELL_SIZE;
+                if (cell.walls[0]) ctx.strokeRect(x, y, CELL_SIZE, 0);
+                if (cell.walls[1]) ctx.strokeRect(x + CELL_SIZE, y, 0, CELL_SIZE);
+                if (cell.walls[2]) ctx.strokeRect(x, y + CELL_SIZE, CELL_SIZE, 0);
+                if (cell.walls[3]) ctx.strokeRect(x, y, 0, CELL_SIZE);
+            }
+
+            // Saída
+            ctx.fillStyle = '#00ff88';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ff88';
+            ctx.fillRect(goal.x * CELL_SIZE + 4, goal.y * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8);
+
+            // Jogador
+            ctx.fillStyle = '#3399ff';
+            ctx.shadowColor = '#44aaff';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Controles
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault();
+        });
+
+        window.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        function returnToMenu() {
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('menu').style.display = 'block';
+            clearInterval(timerInterval);
+        }
+
+        function restartSameLevel() {
+            initLevel();
+        }
+
+        // Mostrar recorde atual no HUD
+        setInterval(() => {
+            const best = bestTimes[difficultyName];
+            if (best) document.getElementById('best-time').textContent = formatTime(best);
+        }, 1000);
+    </script>
+</body>
+</html>
