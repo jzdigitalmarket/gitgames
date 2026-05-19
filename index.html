@@ -125,6 +125,94 @@
         .dpad-center { top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(14,165,233,0.05); font-size: 9px; color: var(--text); }
         @media (max-width: 500px) { #dpad { display: block; } }
 
+        /* Audio player */
+        .audio-player {
+            position: relative; z-index: 10;
+            background: rgba(14,165,233,0.08);
+            border: 1px solid rgba(14,165,233,0.2);
+            border-radius: 6px;
+            padding: 8px 14px;
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 400px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        body.hard-mode .audio-player {
+            background: rgba(255,77,77,0.08);
+            border-color: rgba(255,77,77,0.2);
+        }
+        .audio-btn {
+            padding: 6px 12px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border: 1px solid rgba(14,165,233,0.3);
+            background: rgba(14,165,233,0.1);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .audio-btn:hover {
+            background: rgba(14,165,233,0.25);
+            border-color: rgba(14,165,233,0.5);
+        }
+        .audio-btn.active {
+            background: rgba(56,189,248,0.3);
+            color: var(--player);
+            border-color: rgba(56,189,248,0.5);
+        }
+        body.hard-mode .audio-btn.active {
+            background: rgba(255,77,77,0.3);
+            color: var(--hard);
+            border-color: rgba(255,77,77,0.5);
+        }
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #volumeSlider {
+            width: 80px;
+            height: 3px;
+            border-radius: 2px;
+            background: rgba(14,165,233,0.2);
+            outline: none;
+            cursor: pointer;
+        }
+        #volumeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--player);
+            cursor: pointer;
+        }
+        #volumeSlider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--player);
+            border: none;
+            cursor: pointer;
+        }
+        .track-label {
+            font-size: 0.6rem;
+            color: var(--text);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            min-width: 100px;
+            text-align: center;
+        }
+        #audioFileInput {
+            display: none;
+        }
+
         footer { position: relative; z-index: 10; padding: 6px; font-size: 0.55rem; color: var(--text); letter-spacing: 1px; text-align: center; }
     </style>
 </head>
@@ -163,6 +251,20 @@
 <div class="btn-row">
     <button class="btn" id="new-maze-btn">↺ NOVO</button>
 </div>
+
+<!-- Audio player -->
+<div class="audio-player">
+    <div class="track-label" id="track-name">🎵 Normal</div>
+    <button class="audio-btn active" id="btn-play">▶ Play</button>
+    <button class="audio-btn" id="btn-pause">⏸ Pause</button>
+    <div class="volume-control">
+        <span style="font-size:0.6rem;color:var(--text)">🔊</span>
+        <input type="range" id="volumeSlider" min="0" max="100" value="50">
+    </div>
+    <button class="audio-btn" id="btn-upload">📁 Upload</button>
+</div>
+
+<input type="file" id="audioFileInput" accept="audio/*">
 
 <div id="game-wrap">
     <div id="canvas-container">
@@ -206,6 +308,100 @@
 <script>
 const canvas = document.getElementById('mazeCanvas'), ctx = canvas.getContext('2d');
 const mmCanvas = document.getElementById('minimap'), mmCtx = mmCanvas.getContext('2d');
+
+// ─── Audio Setup ──────────────────────────────────────────────────────────────
+const audioElement = new Audio();
+audioElement.loop = true;
+audioElement.volume = 0.5;
+
+// Default tracks (using placeholder data URIs with silence)
+const TRACKS = {
+    normal: 'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==',
+    hard: 'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA=='
+};
+
+let currentTrack = 'normal';
+let isPlaying = false;
+
+function setTrack(trackKey) {
+    const wasPlaying = isPlaying;
+    if (isPlaying) audioElement.pause();
+    
+    currentTrack = trackKey;
+    const trackName = trackKey === 'normal' ? 'Normal' : 'HARD - Crisis Mode';
+    document.getElementById('track-name').textContent = '🎵 ' + trackName;
+    audioElement.src = TRACKS[trackKey];
+    
+    if (wasPlaying) {
+        setTimeout(() => {
+            audioElement.play().then(() => {
+                isPlaying = true;
+                document.getElementById('btn-play').classList.add('active');
+                document.getElementById('btn-pause').classList.remove('active');
+            }).catch(e => console.log('Auto-play failed:', e));
+        }, 100);
+    }
+}
+
+document.getElementById('btn-play').addEventListener('click', () => {
+    if (!isPlaying) {
+        const playPromise = audioElement.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                isPlaying = true;
+                document.getElementById('btn-play').classList.add('active');
+                document.getElementById('btn-pause').classList.remove('active');
+            }).catch(e => console.log('Play failed:', e));
+        }
+    }
+});
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+    if (isPlaying) {
+        audioElement.pause();
+        isPlaying = false;
+        document.getElementById('btn-play').classList.remove('active');
+        document.getElementById('btn-pause').classList.add('active');
+    }
+});
+
+document.getElementById('volumeSlider').addEventListener('input', (e) => {
+    audioElement.volume = e.target.value / 100;
+});
+
+document.getElementById('btn-upload').addEventListener('click', () => {
+    document.getElementById('audioFileInput').click();
+});
+
+document.getElementById('audioFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const dataUrl = event.target.result;
+            TRACKS.custom = dataUrl;
+            currentTrack = 'custom';
+            document.getElementById('track-name').textContent = '🎵 ' + file.name.substring(0, 20);
+            audioElement.src = dataUrl;
+            if (isPlaying) {
+                audioElement.play().then(() => {
+                    console.log('Audio playing');
+                }).catch(e => console.log('Play failed:', e));
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Update track when mode changes
+function updateAudioForMode() {
+    if (isHardMode) {
+        if (currentTrack !== 'hard' && currentTrack !== 'custom') setTrack('hard');
+    } else {
+        if (currentTrack !== 'normal' && currentTrack !== 'custom') setTrack('normal');
+    }
+}
+
 
 const COLS = 31, ROWS = 31, CELL_SIZE = 18;
 canvas.width = COLS * CELL_SIZE;
@@ -494,6 +690,7 @@ document.getElementById('btn-normal').addEventListener('click', () => {
     document.getElementById('btn-hard').classList.remove('active', 'hard');
     document.getElementById('subtitle').textContent = '[ nível normal ]';
     clearDynamicWalls();
+    updateAudioForMode();
     initGame();
 });
 
@@ -503,6 +700,7 @@ document.getElementById('btn-hard').addEventListener('click', () => {
     document.getElementById('btn-hard').classList.add('active', 'hard');
     document.getElementById('btn-normal').classList.remove('active');
     document.getElementById('subtitle').textContent = '[ nível crítico — paredes mutáveis ]';
+    updateAudioForMode();
     initGame();
 });
 
