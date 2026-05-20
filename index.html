@@ -93,7 +93,7 @@
             box-shadow: 0 0 0 1px rgba(255,77,77,0.08), 0 0 40px rgba(255,77,77,0.2), inset 0 0 40px rgba(0,0,0,0.5);
         }
         canvas { display: block; }
-        #minimap { position: absolute; top: 8px; right: 8px; border: 1px solid rgba(14,165,233,0.3); border-radius: 3px; background: rgba(8,11,16,0.85); }
+         // <-- #minimap { position: absolute; top: 8px; right: 8px; border: 1px solid rgba(14,165,233,0.3); border-radius: 3px; background: rgba(8,11,16,0.85); } -->
         #canvas-container::after {
             content: ''; position: absolute; inset: 0;
             background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
@@ -307,7 +307,7 @@
 
 <script>
 const canvas = document.getElementById('mazeCanvas'), ctx = canvas.getContext('2d');
-// <!-- const mmCanvas = document.getElementById('minimap'), mmCtx = mmCanvas.getContext('2d'); -->
+/* const mmCanvas = document.getElementById('minimap'), mmCtx = mmCanvas.getContext('2d'); */
 
 // ─── Audio Setup ──────────────────────────────────────────────────────────────
 const audioElement = new Audio();
