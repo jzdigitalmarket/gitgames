@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ambiente 3D Interativo</title>
+    <title>Ambiente 3D Interativo com Colisões</title>
     <style>
         body {
             margin: 0;
@@ -30,7 +30,6 @@
         ul { margin: 0; padding-left: 20px; }
         li { margin-bottom: 5px; }
     </style>
-    <!-- Importando o Three.js e o OrbitControls para a câmera -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
@@ -42,6 +41,7 @@
             <li><strong>W, A, S, D</strong> ou <strong>Setas</strong>: Mover o Jogador</li>
             <li><strong>Clique + Arraste o Mouse</strong>: Girar a Câmera</li>
             <li><strong>Scroll do Mouse</strong>: Zoom</li>
+            <li><em>O jogador agora bate e desliza nos obstáculos!</em></li>
         </ul>
     </div>
 
@@ -65,11 +65,11 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // --- CONTROLES DE CÂMERA (MOUSE) ---
+        // --- CONTROLES DE CÂMERA ---
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.05; // Evita que a câmera passe para baixo do chão
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
         // --- ILUMINAÇÃO ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -80,17 +80,9 @@
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048;
         dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5;
-        dirLight.shadow.camera.far = 100;
-        const d = 30;
-        dirLight.shadow.camera.left = -d;
-        dirLight.shadow.camera.right = d;
-        dirLight.shadow.camera.top = d;
-        dirLight.shadow.camera.bottom = -d;
         scene.add(dirLight);
 
-        // --- CENÁRIO (CHÃO E OBSTÁCULOS) ---
-        // Chão principal
+        // --- CENÁRIO E OBSTÁCULOS ---
         const floorGeo = new THREE.PlaneGeometry(60, 60);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.8 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -98,118 +90,137 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Grade de referência no chão
         const grid = new THREE.GridHelper(60, 30, 0x00ffcc, 0x444444);
-        grid.position.y = 0.01; // Levemente acima do chão para evitar flickering
+        grid.position.y = 0.01;
         scene.add(grid);
 
-        // Alguns obstáculos aleatórios na arena
+        // Array para guardar as caixas de colisão dos obstáculos
+        const obstaclesBoxes = [];
+
         const obstacleGeo = new THREE.BoxGeometry(3, 6, 3);
         const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x393e46, roughness: 0.5 });
         
-        for(let i = 0; i < 8; i++) {
+        for(let i = 0; i < 12; i++) {
             const obstacle = new THREE.Mesh(obstacleGeo, obstacleMat);
-            obstacle.position.x = (Math.random() - 0.5) * 40;
-            obstacle.position.z = (Math.random() - 0.5) * 40;
-            obstacle.position.y = 3; // Metade da altura para apoiar no chão
+            
+            // Evita gerar obstáculos colados na posição inicial do jogador (0,0)
+            let x = (Math.random() - 0.5) * 40;
+            let z = (Math.random() - 0.5) * 40;
+            while(Math.abs(x) < 5 && Math.abs(z) < 5) {
+                x = (Math.random() - 0.5) * 40;
+                z = (Math.random() - 0.5) * 40;
+            }
+
+            obstacle.position.set(x, 3, z);
             obstacle.castShadow = true;
             obstacle.receiveShadow = true;
             scene.add(obstacle);
+
+            // Criar e computar a Bounding Box do obstáculo estático
+            const box = new THREE.Box3().setFromObject(obstacle);
+            obstaclesBoxes.push(box);
         }
 
         // --- JOGADOR ---
-        // Grupo para conter o corpo e os olhos (direcionamento)
         const playerGroup = new THREE.Group();
 
-        // Corpo do jogador
         const bodyGeo = new THREE.BoxGeometry(2, 2, 2);
         const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00adb5, roughness: 0.2, metalness: 0.5 });
         const playerBody = new THREE.Mesh(bodyGeo, bodyMat);
         playerBody.castShadow = true;
         playerGroup.add(playerBody);
 
-        // "Olhos" ou visor para saber para onde ele está olhando
         const visorGeo = new THREE.BoxGeometry(1.6, 0.4, 0.4);
         const visorMat = new THREE.MeshBasicMaterial({ color: 0xfff700 });
         const visor = new THREE.Mesh(visorGeo, visorMat);
-        visor.position.set(0, 0.4, -1); // Posicionado na face frontal (-Z)
+        visor.position.set(0, 0.4, -1);
         playerGroup.add(visor);
 
-        playerGroup.position.y = 1; // Alinha a base ao chão
+        playerGroup.position.set(0, 1, 0);
         scene.add(playerGroup);
 
-        // --- SISTEMA DE ENTRADA DO TECLADO ---
-        const keys = {
-            w: false, a: false, s: false, d: false,
-            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false
-        };
+        // Criar a caixa de colisão dinâmica para o jogador
+        const playerBox = new THREE.Box3();
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key in keys) keys[e.key] = true;
-        });
+        // --- TECLADO ---
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        window.addEventListener('keydown', (e) => { if (e.key in keys) keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
 
-        window.addEventListener('keyup', (e) => {
-            if (e.key in keys) keys[e.key] = false;
-        });
-
-        // --- FÍSICA E MOVIMENTAÇÃO SIMPLES ---
+        // --- LÓGICA DE MOVIMENTO COM DETECÇÃO DE COLISÃO ---
         const moveSpeed = 0.15;
-        const playerVelocity = new THREE.Vector3();
+
+        function checkCollision(nextPosition) {
+            // Cria uma cópia temporária da caixa do jogador posicionada onde ele *pretende* ir
+            playerBox.setFromObject(playerGroup);
+            
+            // Movemos a caixa de simulação para a nova coordenada calculada
+            const currentPos = playerGroup.position;
+            const translation = new THREE.Vector3().subVectors(nextPosition, currentPos);
+            playerBox.translate(translation);
+
+            // Compara com todos os obstáculos do cenário
+            for (let i = 0; i < obstaclesBoxes.length; i++) {
+                if (playerBox.intersectsBox(obstaclesBoxes[i])) {
+                    return true; // Houve choque!
+                }
+            }
+            return false; // Caminho livre
+        }
 
         function updateMovement() {
             let moveX = 0;
             let moveZ = 0;
 
-            // Mapeando inputs
             if (keys.w || keys.ArrowUp) moveZ -= 1;
             if (keys.s || keys.ArrowDown) moveZ += 1;
             if (keys.a || keys.ArrowLeft) moveX -= 1;
             if (keys.d || keys.ArrowRight) moveX += 1;
 
             if (moveX !== 0 || moveZ !== 0) {
-                // Criar vetor de direção baseado no input
                 const direction = new THREE.Vector3(moveX, 0, moveZ).normalize();
                 
-                // Mover o jogador
-                playerGroup.position.addScaledVector(direction, moveSpeed);
+                // --- AJUSTE DE COLISÃO POR EIXO (Slide Collision) ---
+                // Testamos o movimento no Eixo X separadamente
+                const nextPosX = playerGroup.position.clone();
+                nextPosX.x += direction.x * moveSpeed;
+                if (!checkCollision(nextPosX)) {
+                    playerGroup.position.x = nextPosX.x;
+                }
 
-                // Rotacionar suavemente o jogador para olhar na direção do movimento
+                // Testamos o movimento no Eixo Z separadamente
+                const nextPosZ = playerGroup.position.clone();
+                nextPosZ.z += direction.z * moveSpeed;
+                if (!checkCollision(nextPosZ)) {
+                    playerGroup.position.z = nextPosZ.z;
+                }
+
+                // Rotacionar o visor para a direção do movimento
                 const targetAngle = Math.atan2(direction.x, direction.z);
-                
-                // Interpolação suave de rotação (slerp manual para o ângulo Y)
                 let diff = targetAngle - playerGroup.rotation.y;
-                // Normaliza a diferença entre -PI e PI
                 diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                 playerGroup.rotation.y += diff * 0.2;
             }
 
-            // Limites da arena (não deixar sair do mapa de 60x60)
+            // Limites da arena
             playerGroup.position.x = Math.max(-29, Math.min(29, playerGroup.position.x));
             playerGroup.position.z = Math.max(-29, Math.min(29, playerGroup.position.z));
-            
-            // Fazer a câmera seguir sutilmente o alvo (opcional, mantendo o controle do mouse ativo)
-            // Se preferir câmera fixa estilo RPG, descomente a linha abaixo:
-            // controls.target.copy(playerGroup.position);
         }
 
-        // --- LOOP DE ANIMAÇÃO ---
+        // --- LOOP ---
         function animate() {
             requestAnimationFrame(animate);
-
             updateMovement();
-            controls.update(); // Necessário para o efeito damping da câmera
-            
+            controls.update();
             renderer.render(scene, camera);
         }
 
-        // --- AJUSTE DE TELA (RESIZE) ---
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Inicia o loop
         animate();
     </script>
 </body>
