@@ -237,7 +237,7 @@
             });
         }
 
-        // --- TECLADO ---
+    // --- TECLADO ---
         const keys = { w: false, a: false, s: false, d: false };
         window.addEventListener('keydown', (e) => { 
             const key = e.key.toLowerCase();
@@ -245,12 +245,18 @@
             
             // Gatilho do tiro na Barra de Espaço
             if (e.key === " " || e.code === "Space") {
+                e.preventDefault(); // <-- ISSO AQUI EVITA QUE O NAVEGADOR PERDA O FOCO OU ROLLE A PÁGINA
                 fireLaser();
             }
         });
         window.addEventListener('keyup', (e) => { 
             const key = e.key.toLowerCase();
             if (key in keys) keys[key] = false; 
+            
+            // Também evita o comportamento ao soltar a tecla, por segurança
+            if (e.key === " " || e.code === "Space") {
+                e.preventDefault();
+            }
         });
 
         // --- ALTERNÂNCIA DE CÂMERA ---
