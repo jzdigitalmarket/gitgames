@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ambiente 3D - Primeira e Terceira Pessoa</title>
+    <title>Ambiente 3D - Sistema de Tiros</title>
     <style>
         body {
             margin: 0;
@@ -32,7 +32,6 @@
         ul { margin: 0; padding-left: 20px; }
         li { margin-bottom: 5px; }
         
-        /* Botão de Alternar Câmera */
         #btn-camera {
             position: absolute;
             bottom: 30px;
@@ -56,15 +55,14 @@
             transform: translateX(-50%) scale(1.05);
         }
         
-        /* Mira central para a Primeira Pessoa */
         #crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             transform: translate(-50%, -50%);
-            border: 2px solid rgba(0, 255, 204, 0.7);
+            border: 2px solid #ff0055;
             border-radius: 50%;
             pointer-events: none;
             display: none;
@@ -80,6 +78,7 @@
         <div id="controls-text">
             <ul>
                 <li><strong>W, A, S, D</strong>: Mover o Jogador</li>
+                <li><strong>BARRA DE ESPAÇO</strong>: Atirar!</li>
                 <li><strong>Clique + Arraste</strong>: Girar Câmera</li>
                 <li><strong>Scroll</strong>: Zoom</li>
             </ul>
@@ -102,10 +101,8 @@
         scene.background = new THREE.Color(0x1a1a2e);
         scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015);
 
-        // --- CÂMERA ---
+        // --- CÂMERA E MODO ---
         const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-        
-        // Estado da câmera: '3P' (Terceira Pessoa) ou '1P' (Primeira Pessoa)
         let cameraMode = '3P'; 
 
         // --- RENDERIZADOR ---
@@ -115,18 +112,16 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // --- CONTROLES TERCEIRA PESSOA (OrbitControls) ---
+        // --- CONTROLES TERCEIRA PESSOA ---
         const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
         orbitControls.enableDamping = true;
         orbitControls.dampingFactor = 0.05;
         orbitControls.maxPolarAngle = Math.PI / 2 - 0.05;
-        
-        // Posição inicial da câmera 3P
         camera.position.set(0, 15, 25);
 
-        // --- VARIÁVEIS PARA PRIMEIRA PESSOA (Mouse Look) ---
-        let fpPitch = 0; // Rotação para cima/baixo (Olhar vertical)
-        let fpYaw = 0;   // Rotação para os lados (Olhar horizontal)
+        // --- VARIÁVEIS PRIMEIRA PESSOA ---
+        let fpPitch = 0; 
+        let fpYaw = 0;   
         const mouseSensitivity = 0.002;
 
         // --- ILUMINAÇÃO ---
@@ -140,7 +135,7 @@
         dirLight.shadow.mapSize.height = 2048;
         scene.add(dirLight);
 
-        // --- CENÁRIO E OBSTÁCULOS ---
+        // --- CENÁRIO ---
         const floorGeo = new THREE.PlaneGeometry(60, 60);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.8 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -152,25 +147,33 @@
         grid.position.y = 0.01;
         scene.add(grid);
 
-        const obstaclesBoxes = [];
+        // --- LISTA DE OBSTÁCULOS COM VIDA ---
+        const obstacles = []; // Guardará objetos estruturados { mesh, box, life }
         const obstacleGeo = new THREE.BoxGeometry(3, 6, 3);
-        const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x393e46, roughness: 0.5 });
         
         for(let i = 0; i < 15; i++) {
-            const obstacle = new THREE.Mesh(obstacleGeo, obstacleMat);
+            // Material único para cada um poder piscar independentemente ao levar tiro
+            const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x393e46, roughness: 0.5 });
+            const mesh = new THREE.Mesh(obstacleGeo, obstacleMat);
+            
             let x = (Math.random() - 0.5) * 44;
             let z = (Math.random() - 0.5) * 44;
             while(Math.abs(x) < 6 && Math.abs(z) < 6) {
                 x = (Math.random() - 0.5) * 44;
                 z = (Math.random() - 0.5) * 44;
             }
-            obstacle.position.set(x, 3, z);
-            obstacle.castShadow = true;
-            obstacle.receiveShadow = true;
-            scene.add(obstacle);
+            mesh.position.set(x, 3, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
 
-            const box = new THREE.Box3().setFromObject(obstacle);
-            obstaclesBoxes.push(box);
+            const box = new THREE.Box3().setFromObject(mesh);
+            obstacles.push({
+                mesh: mesh,
+                box: box,
+                life: 3, // Precisa de 3 tiros para quebrar
+                hitTimer: 0
+            });
         }
 
         // --- JOGADOR ---
@@ -185,7 +188,7 @@
         const visorGeo = new THREE.BoxGeometry(1.6, 0.4, 0.4);
         const visorMat = new THREE.MeshBasicMaterial({ color: 0xfff700 });
         const visor = new THREE.Mesh(visorGeo, visorMat);
-        visor.position.set(0, 0.4, -1); // Face frontal original (-Z)
+        visor.position.set(0, 0.4, -1);
         playerGroup.add(visor);
 
         playerGroup.position.set(0, 1, 0);
@@ -193,61 +196,98 @@
 
         const playerBox = new THREE.Box3();
 
+        // --- ARSENAL DE TIROS (LASERS) ---
+        const lasers = [];
+        const laserSpeed = 0.6;
+        const laserGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.5, 8);
+        laserGeo.rotateX(Math.PI / 2); // Deita o cilindro para apontar para a frente
+        const laserMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+
+        function fireLaser() {
+            const laserMesh = new THREE.Mesh(laserGeo, laserMat);
+            const direction = new THREE.Vector3();
+
+            if (cameraMode === '3P') {
+                // Em 3P, atira para onde o robô está virado (Eixo Z local negativo)
+                laserMesh.position.copy(playerGroup.position);
+                laserMesh.position.y += 0.4; // Altura do visor
+                
+                // Pega a direção global para onde a frente do robô aponta
+                playerGroup.getWorldDirection(direction);
+                direction.negate(); // Inverte porque o Three.js considera +Z como a "traseira" do objeto
+                
+                // Rotaciona o laser para alinhar com a direção do tiro
+                laserMesh.rotation.copy(playerGroup.rotation);
+            } else {
+                // Em 1P, atira exatamente para onde a câmera está olhando
+                laserMesh.position.copy(camera.position);
+                
+                camera.getWorldDirection(direction);
+                
+                // Alinha o laser com a rotação da câmera
+                laserMesh.quaternion.copy(camera.quaternion);
+            }
+
+            // Adiciona na cena e na nossa lista de rastreamento
+            scene.add(laserMesh);
+            lasers.push({
+                mesh: laserMesh,
+                dir: direction.normalize(),
+                box: new THREE.Box3()
+            });
+        }
+
         // --- TECLADO ---
         const keys = { w: false, a: false, s: false, d: false };
         window.addEventListener('keydown', (e) => { 
             const key = e.key.toLowerCase();
             if (key in keys) keys[key] = true; 
+            
+            // Gatilho do tiro na Barra de Espaço
+            if (e.key === " " || e.code === "Space") {
+                fireLaser();
+            }
         });
         window.addEventListener('keyup', (e) => { 
             const key = e.key.toLowerCase();
             if (key in keys) keys[key] = false; 
         });
 
-        // --- GERENCIAMENTO DE ALTERNÂNCIA DE CÂMERA ---
+        // --- ALTERNÂNCIA DE CÂMERA ---
         btnCamera.addEventListener('click', () => {
-            if (cameraMode === '3P') {
-                // Ativa a Primeira Pessoa solicitando o travamento do ponteiro
-                renderer.domElement.requestPointerLock();
-            } else {
-                document.exitPointerLock();
-            }
+            if (cameraMode === '3P') renderer.domElement.requestPointerLock();
+            else document.exitPointerLock();
         });
 
-        // Evento que detecta se o ponteiro do mouse foi travado ou solto
         document.addEventListener('pointerlockchange', () => {
             if (document.pointerLockElement === renderer.domElement) {
-                // Entrou em Primeira Pessoa
                 cameraMode = '1P';
                 orbitControls.enabled = false;
                 crosshair.style.display = 'block';
                 btnCamera.textContent = 'Mudar para 3ª Pessoa';
-                
-                // Sincroniza a direção do olhar inicial 1P com a rotação atual do robô
-                fpYaw = playerGroup.rotation.y + Math.PI; // Ajuste de ângulo de faceamento
+                fpYaw = playerGroup.rotation.y + Math.PI;
                 fpPitch = 0;
                 
                 controlsText.innerHTML = `
                     <ul>
-                        <li><strong>W, A, S, D</strong>: Mover para Frente/Lados</li>
-                        <li><strong>Movimentar Mouse</strong>: Olhar ao redor</li>
+                        <li><strong>W, A, S, D</strong>: Mover o Robô</li>
+                        <li><strong>ESPAÇO</strong>: Atirar!</li>
+                        <li><strong>Mouse</strong>: Olhar ao redor</li>
                         <li><strong>ESC</strong>: Sair da 1ª Pessoa</li>
                     </ul>
                 `;
             } else {
-                // Voltou para Terceira Pessoa
                 cameraMode = '3P';
                 orbitControls.enabled = true;
                 crosshair.style.display = 'none';
                 btnCamera.textContent = 'Mudar para 1ª Pessoa';
-                
-                // Recua a câmera para trás do player para não dar um tranco visual
                 camera.position.set(playerGroup.position.x, playerGroup.position.y + 10, playerGroup.position.z + 20);
                 orbitControls.target.copy(playerGroup.position);
 
                 controlsText.innerHTML = `
                     <ul>
                         <li><strong>W, A, S, D</strong>: Mover o Jogador</li>
+                        <li><strong>BARRA DE ESPAÇO</strong>: Atirar!</li>
                         <li><strong>Clique + Arraste</strong>: Girar Câmera</li>
                         <li><strong>Scroll</strong>: Zoom</li>
                     </ul>
@@ -255,102 +295,137 @@
             }
         });
 
-        // Captura o movimento do mouse para olhar em 1ª pessoa
         document.addEventListener('mousemove', (e) => {
             if (cameraMode !== '1P') return;
-
             fpYaw -= e.movementX * mouseSensitivity;
             fpPitch -= e.movementY * mouseSensitivity;
-
-            // Limita o ângulo vertical (evita dar uma cambalhota com a cabeça)
             fpPitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, fpPitch));
         });
 
-        // --- FUNÇÃO AUXILIAR DE COLISÃO ---
-        function checkCollision(nextPosition) {
+        // --- VERIFICAÇÃO DE COLISÃO DO JOGADOR ---
+        function checkPlayerCollision(nextPosition) {
             playerBox.setFromObject(playerGroup);
             const currentPos = playerGroup.position;
             const translation = new THREE.Vector3().subVectors(nextPosition, currentPos);
             playerBox.translate(translation);
 
-            for (let i = 0; i < obstaclesBoxes.length; i++) {
-                if (playerBox.intersectsBox(obstaclesBoxes[i])) return true;
+            for (let i = 0; i < obstacles.length; i++) {
+                if (playerBox.intersectsBox(obstacles[i].box)) return true;
             }
             return false;
         }
 
-        // --- LÓGICA DE MOVIMENTO E ATUALIZAÇÃO DE CÂMERA ---
+        // --- SISTEMA DE ATUALIZAÇÃO DOS TIROS ---
+        function updateLasers() {
+            // Varre a lista de trás para frente para poder remover elementos sem quebrar o loop
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                const laser = lasers[i];
+                
+                // Move o laser para a direção do tiro
+                laser.mesh.position.addScaledVector(laser.dir, laserSpeed);
+                
+                // Atualiza a Bounding Box do laser
+                laser.box.setFromObject(laser.mesh);
+
+                let hitSomething = false;
+
+                // Testa colisão com cada obstáculo ativo
+                for (let j = obstacles.length - 1; j >= 0; j--) {
+                    const obs = obstacles[j];
+                    
+                    if (laser.box.intersectsBox(obs.box)) {
+                        hitSomething = true;
+                        obs.life -= 1;
+                        obs.hitTimer = 5; // Faz piscar por 5 frames
+                        
+                        // Se a vida do bloco zerar, remove ele do jogo
+                        if (obs.life <= 0) {
+                            scene.remove(obs.mesh);
+                            obstacles.splice(j, 1);
+                        }
+                        break;
+                    }
+                }
+
+                // Remove o laser se ele colidir ou se voar para muito longe (fora do mapa)
+                if (hitSomething || laser.mesh.position.length() > 80) {
+                    scene.remove(laser.mesh);
+                    lasers.splice(i, 1);
+                }
+            }
+
+            // Gerencia o efeito visual de piscar dos blocos atingidos
+            for (let i = 0; i < obstacles.length; i++) {
+                const obs = obstacles[i];
+                if (obs.hitTimer > 0) {
+                    obs.hitTimer--;
+                    obs.mesh.material.color.setHex(0xff0000); // Fica vermelho
+                } else {
+                    obs.mesh.material.color.setHex(0x393e46); // Volta à cor padrão
+                }
+            }
+        }
+
+        // --- MOVIMENTAÇÃO DO AVATAR ---
         const moveSpeed = 0.15;
 
         function updateGame() {
             let inputX = 0;
             let inputZ = 0;
 
-            if (keys.w) inputZ += 1;
-            if (keys.s) inputZ -= 1;
+            if (keys.w) inputZ -= 1;
+            if (keys.s) inputZ += 1;
             if (keys.a) inputX -= 1;
             if (keys.d) inputX += 1;
 
             if (cameraMode === '3P') {
-                // --- MOVIMENTO EM 3ª PESSOA (Lógica Clássica) ---
                 if (inputX !== 0 || inputZ !== 0) {
                     const direction = new THREE.Vector3(inputX, 0, inputZ).normalize();
                     
-                    // Colisão por eixos (Deslizar)
                     const nextPosX = playerGroup.position.clone(); nextPosX.x += direction.x * moveSpeed;
-                    if (!checkCollision(nextPosX)) playerGroup.position.x = nextPosX.x;
+                    if (!checkPlayerCollision(nextPosX)) playerGroup.position.x = nextPosX.x;
 
                     const nextPosZ = playerGroup.position.clone(); nextPosZ.z += direction.z * moveSpeed;
-                    if (!checkCollision(nextPosZ)) playerGroup.position.z = nextPosZ.z;
+                    if (!checkPlayerCollision(nextPosZ)) playerGroup.position.z = nextPosZ.z;
 
-                    // Rotaciona o robô suavemente para encarar a direção da corrida
                     const targetAngle = Math.atan2(direction.x, direction.z);
                     let diff = targetAngle - playerGroup.rotation.y;
                     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                     playerGroup.rotation.y += diff * 0.2;
                 }
-                
-                // Atualiza o ponto focal dos controles da câmera 3P
                 orbitControls.target.copy(playerGroup.position);
-                
             } else {
-                // --- MOVIMENTO EM 1ª PESSOA (Estilo FPS) ---
-                // Na primeira pessoa, a rotação do corpo do jogador segue rigidamente o Yaw do mouse
                 playerGroup.rotation.y = fpYaw - Math.PI;
 
                 if (inputX !== 0 || inputZ !== 0) {
-                    // Direção do movimento baseada na orientação atual do jogador
                     const moveVector = new THREE.Vector3(inputX, 0, inputZ).normalize();
-                    // Aplica a rotação do corpo para mover em relação a onde ele está olhando
                     moveVector.applyQuaternion(playerGroup.quaternion);
 
-                    // Colisão deslizante em X e Z usando o vetor rotacionado
                     const nextPosX = playerGroup.position.clone(); nextPosX.x += moveVector.x * moveSpeed;
-                    if (!checkCollision(nextPosX)) playerGroup.position.x = nextPosX.x;
+                    if (!checkPlayerCollision(nextPosX)) playerGroup.position.x = nextPosX.x;
 
                     const nextPosZ = playerGroup.position.clone(); nextPosZ.z += moveVector.z * moveSpeed;
-                    if (!checkCollision(nextPosZ)) playerGroup.position.z = nextPosZ.z;
+                    if (!checkPlayerCollision(nextPosZ)) playerGroup.position.z = nextPosZ.z;
                 }
 
-                // Posiciona a câmera exatamente nos "olhos" do robô (dentro do grupo do jogador)
                 camera.position.copy(playerGroup.position);
-                camera.position.y += 0.4; // Ajuste de altura para a linha do visor
+                camera.position.y += 0.4; 
                 
-                // Calcula para onde a câmera está olhando baseado no Pitch e Yaw acumulados do mouse
                 const target = new THREE.Vector3(0, 0, -1);
                 const euler = new THREE.Euler(fpPitch, fpYaw, 0, 'YXZ');
                 target.applyEuler(euler);
                 target.add(camera.position);
-                
                 camera.lookAt(target);
             }
 
-            // Limites do mapa (60x60)
             playerGroup.position.x = Math.max(-29, Math.min(29, playerGroup.position.x));
             playerGroup.position.z = Math.max(-29, Math.min(29, playerGroup.position.z));
+            
+            // Atualiza os projéteis na tela
+            updateLasers();
         }
 
-        // --- LOOP PRINCIPAL ---
+        // --- LOOP ---
         function animate() {
             requestAnimationFrame(animate);
             updateGame();
