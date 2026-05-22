@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ambiente 3D - Sistema de Tiros</title>
+    <title>Ambiente 3D - Jogo Completo</title>
     <style>
         body {
             margin: 0;
@@ -16,22 +16,83 @@
             width: 100vw;
             height: 100vh;
         }
+        
+        /* Painel de Instruções */
         #ui-instructions {
             position: absolute;
             top: 20px;
             left: 20px;
             color: #fff;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(10, 10, 25, 0.85);
             padding: 15px;
             border-radius: 8px;
             pointer-events: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            max-width: 300px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            max-width: 280px;
         }
-        h3 { margin: 0 0 10px 0; color: #00ffcc; }
-        ul { margin: 0; padding-left: 20px; }
+        h3 { margin: 0 0 10px 0; color: #00ffcc; font-size: 16px; }
+        ul { margin: 0; padding-left: 20px; font-size: 13px; }
         li { margin-bottom: 5px; }
         
+        /* Painel de Status (Pontos e Energia) */
+        #ui-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            background: rgba(10, 10, 25, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            width: 220px;
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .status-row:last-child { margin-bottom: 0; }
+        #score-display {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ffff00;
+        }
+        
+        /* Container da Barra de Energia */
+        .energy-bar-container {
+            width: 100%;
+            height: 14px;
+            background-color: #222;
+            border-radius: 7px;
+            overflow: hidden;
+            border: 1px solid #444;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+        #energy-bar {
+            width: 100%;
+            height: 100%;
+            background-color: #00ffcc;
+            box-shadow: 0 0 8px #00ffcc;
+            transition: width 0.05s linear, background-color 0.2s ease;
+        }
+        #warning-text {
+            font-size: 11px;
+            color: #ff0055;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 3px;
+            visibility: hidden;
+            animation: blink 0.5s infinite alternate;
+        }
+        @keyframes blink {
+            from { opacity: 1; } to { opacity: 0.3; }
+        }
+
+        /* Botão de Alternar Câmera */
         #btn-camera {
             position: absolute;
             bottom: 30px;
@@ -55,6 +116,7 @@
             transform: translateX(-50%) scale(1.05);
         }
         
+        /* Mira central para a Primeira Pessoa */
         #crosshair {
             position: absolute;
             top: 50%;
@@ -73,6 +135,7 @@
 </head>
 <body>
 
+    <!-- UI - Esquerda (Instruções) -->
     <div id="ui-instructions">
         <h3>Controles do Jogo</h3>
         <div id="controls-text">
@@ -85,18 +148,42 @@
         </div>
     </div>
 
+    <!-- UI - Direita (Pontos e Energia) -->
+    <div id="ui-status">
+        <div class="status-row">
+            <span>PONTOS:</span>
+            <span id="score-display">000</span>
+        </div>
+        <div style="margin-top: 15px; font-size: 12px; color: #aaa;">SISTEMA DE LASER:</div>
+        <div class="energy-bar-container">
+            <div id="energy-bar"></div>
+        </div>
+        <div id="warning-text">SUPERAQUECIDO!</div>
+    </div>
+
     <button id="btn-camera">Mudar para 1ª Pessoa</button>
     <div id="crosshair"></div>
 
     <div id="canvas-container"></div>
 
     <script>
-        // --- CONFIGURAÇÃO DA CENA ---
+        // --- ELEMENTOS DA INTERFACE (DOM) ---
         const container = document.getElementById('canvas-container');
         const btnCamera = document.getElementById('btn-camera');
         const crosshair = document.getElementById('crosshair');
         const controlsText = document.getElementById('controls-text');
+        const scoreDisplay = document.getElementById('score-display');
+        const energyBar = document.getElementById('energy-bar');
+        const warningText = document.getElementById('warning-text');
         
+        // --- VARIÁVEIS DE ESTADO DO JOGO ---
+        let score = 0;
+        let energy = 100; // Porcentagem (0 a 100)
+        let isOverheated = false;
+        const laserCost = 15; // Quanto consome por tiro
+        const rechargeRate = 0.4; // Velocidade de recarga por frame (aprox. 24% por segundo)
+
+        // --- CONFIGURAÇÃO DA CENA ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a2e);
         scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015);
@@ -147,17 +234,17 @@
         grid.position.y = 0.01;
         scene.add(grid);
 
-        // --- LISTA DE OBSTÁCULOS COM VIDA ---
-        const obstacles = []; // Guardará objetos estruturados { mesh, box, life }
+        // --- OBSTÁCULOS ---
+        const obstacles = []; 
         const obstacleGeo = new THREE.BoxGeometry(3, 6, 3);
         
-        for(let i = 0; i < 15; i++) {
-            // Material único para cada um poder piscar independentemente ao levar tiro
+        function createObstacle() {
             const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x393e46, roughness: 0.5 });
             const mesh = new THREE.Mesh(obstacleGeo, obstacleMat);
             
             let x = (Math.random() - 0.5) * 44;
             let z = (Math.random() - 0.5) * 44;
+            // Evita spawn em cima do player
             while(Math.abs(x) < 6 && Math.abs(z) < 6) {
                 x = (Math.random() - 0.5) * 44;
                 z = (Math.random() - 0.5) * 44;
@@ -171,9 +258,14 @@
             obstacles.push({
                 mesh: mesh,
                 box: box,
-                life: 3, // Precisa de 3 tiros para quebrar
+                life: 3,
                 hitTimer: 0
             });
+        }
+
+        // Gera 15 obstáculos iniciais
+        for(let i = 0; i < 15; i++) {
+            createObstacle();
         }
 
         // --- JOGADOR ---
@@ -198,37 +290,40 @@
 
         // --- ARSENAL DE TIROS (LASERS) ---
         const lasers = [];
-        const laserSpeed = 0.6;
+        const laserSpeed = 0.7;
         const laserGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.5, 8);
-        laserGeo.rotateX(Math.PI / 2); // Deita o cilindro para apontar para a frente
+        laserGeo.rotateX(Math.PI / 2); 
         const laserMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
 
         function fireLaser() {
+            // Se estiver superaquecido ou sem energia suficiente, impede o tiro
+            if (isOverheated || energy < laserCost) return;
+
+            // Gasta energia
+            energy -= laserCost;
+            if (energy <= 0) {
+                energy = 0;
+                isOverheated = true;
+                warningText.style.visibility = 'visible';
+                energyBar.style.backgroundColor = '#ff0055';
+                energyBar.style.boxShadow = '0 0 8px #ff0055';
+            }
+
             const laserMesh = new THREE.Mesh(laserGeo, laserMat);
             const direction = new THREE.Vector3();
 
             if (cameraMode === '3P') {
-                // Em 3P, atira para onde o robô está virado (Eixo Z local negativo)
                 laserMesh.position.copy(playerGroup.position);
-                laserMesh.position.y += 0.4; // Altura do visor
-                
-                // Pega a direção global para onde a frente do robô aponta
+                laserMesh.position.y += 0.4;
                 playerGroup.getWorldDirection(direction);
-                direction.negate(); // Inverte porque o Three.js considera +Z como a "traseira" do objeto
-                
-                // Rotaciona o laser para alinhar com a direção do tiro
+                direction.negate(); 
                 laserMesh.rotation.copy(playerGroup.rotation);
             } else {
-                // Em 1P, atira exatamente para onde a câmera está olhando
                 laserMesh.position.copy(camera.position);
-                
                 camera.getWorldDirection(direction);
-                
-                // Alinha o laser com a rotação da câmera
                 laserMesh.quaternion.copy(camera.quaternion);
             }
 
-            // Adiciona na cena e na nossa lista de rastreamento
             scene.add(laserMesh);
             lasers.push({
                 mesh: laserMesh,
@@ -237,15 +332,14 @@
             });
         }
 
-    // --- TECLADO ---
+        // --- TECLADO ---
         const keys = { w: false, a: false, s: false, d: false };
         window.addEventListener('keydown', (e) => { 
             const key = e.key.toLowerCase();
             if (key in keys) keys[key] = true; 
             
-            // Gatilho do tiro na Barra de Espaço
             if (e.key === " " || e.code === "Space") {
-                e.preventDefault(); // <-- ISSO AQUI EVITA QUE O NAVEGADOR PERDA O FOCO OU ROLLE A PÁGINA
+                e.preventDefault(); // Impede o navegador de perder o foco ou rolar a tela
                 fireLaser();
             }
         });
@@ -253,7 +347,6 @@
             const key = e.key.toLowerCase();
             if (key in keys) keys[key] = false; 
             
-            // Também evita o comportamento ao soltar a tecla, por segurança
             if (e.key === " " || e.code === "Space") {
                 e.preventDefault();
             }
@@ -321,53 +414,71 @@
             return false;
         }
 
-        // --- SISTEMA DE ATUALIZAÇÃO DOS TIROS ---
-        function updateLasers() {
-            // Varre a lista de trás para frente para poder remover elementos sem quebrar o loop
+        // --- ATUALIZAÇÃO DOS TIROS, PONTOS E ENERGIA ---
+        function updateLasersAndSystems() {
+            // 1. GERENCIAMENTO DE ENERGIA (Autorrecarga)
+            if (!isOverheated) {
+                if (energy < 100) energy += rechargeRate;
+                if (energy > 100) energy = 100;
+            } else {
+                // Se está superaquecido, recarrega um pouco mais devagar como penalidade
+                energy += rechargeRate * 0.7;
+                if (energy >= 100) {
+                    energy = 100;
+                    isOverheated = false; // Pronto para usar novamente
+                    warningText.style.visibility = 'hidden';
+                    energyBar.style.backgroundColor = '#00ffcc';
+                    energyBar.style.boxShadow = '0 0 8px #00ffcc';
+                }
+            }
+            // Atualiza o tamanho visível da barra de UI
+            energyBar.style.width = energy + '%';
+
+            // 2. MOVIMENTAÇÃO E DETECÇÃO DOS LASERS
             for (let i = lasers.length - 1; i >= 0; i--) {
                 const laser = lasers[i];
-                
-                // Move o laser para a direção do tiro
                 laser.mesh.position.addScaledVector(laser.dir, laserSpeed);
-                
-                // Atualiza a Bounding Box do laser
                 laser.box.setFromObject(laser.mesh);
 
                 let hitSomething = false;
 
-                // Testa colisão com cada obstáculo ativo
                 for (let j = obstacles.length - 1; j >= 0; j--) {
                     const obs = obstacles[j];
                     
                     if (laser.box.intersectsBox(obs.box)) {
                         hitSomething = true;
                         obs.life -= 1;
-                        obs.hitTimer = 5; // Faz piscar por 5 frames
+                        obs.hitTimer = 5; 
                         
-                        // Se a vida do bloco zerar, remove ele do jogo
                         if (obs.life <= 0) {
                             scene.remove(obs.mesh);
                             obstacles.splice(j, 1);
+                            
+                            // INCREMENTA A PONTUAÇÃO (+10 pontos por objeto destruído)
+                            score += 10;
+                            scoreDisplay.textContent = String(score).padStart(3, '0');
+
+                            // Respawns automáticos para o mapa nunca ficar completamente vazio
+                            setTimeout(createObstacle, 2000);
                         }
                         break;
                     }
                 }
 
-                // Remove o laser se ele colidir ou se voar para muito longe (fora do mapa)
                 if (hitSomething || laser.mesh.position.length() > 80) {
                     scene.remove(laser.mesh);
                     lasers.splice(i, 1);
                 }
             }
 
-            // Gerencia o efeito visual de piscar dos blocos atingidos
+            // Gerencia o efeito de cor do dano nos blocos
             for (let i = 0; i < obstacles.length; i++) {
                 const obs = obstacles[i];
                 if (obs.hitTimer > 0) {
                     obs.hitTimer--;
-                    obs.mesh.material.color.setHex(0xff0000); // Fica vermelho
+                    obs.mesh.material.color.setHex(0xff0000);
                 } else {
-                    obs.mesh.material.color.setHex(0x393e46); // Volta à cor padrão
+                    obs.mesh.material.color.setHex(0x393e46);
                 }
             }
         }
@@ -427,8 +538,8 @@
             playerGroup.position.x = Math.max(-29, Math.min(29, playerGroup.position.x));
             playerGroup.position.z = Math.max(-29, Math.min(29, playerGroup.position.z));
             
-            // Atualiza os projéteis na tela
-            updateLasers();
+            // Roda o gerenciador de armas, pontos e recarga
+            updateLasersAndSystems();
         }
 
         // --- LOOP ---
