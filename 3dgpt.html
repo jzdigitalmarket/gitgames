@@ -1,0 +1,465 @@
+# Arquivo HTML Melhorado – Arena Shooter Futurista
+
+Salva o conteúdo abaixo como `arena_futurista.html`.
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arena Futurista</title>
+
+<style>
+body {
+    margin:0;
+    overflow:hidden;
+    background:#050816;
+    font-family:Arial;
+}
+
+canvas {
+    display:block;
+}
+
+#hud {
+    position:absolute;
+    top:15px;
+    left:15px;
+    color:white;
+    z-index:10;
+}
+
+.panel {
+    background:rgba(0,0,0,0.6);
+    padding:12px;
+    border-radius:10px;
+    margin-bottom:10px;
+    border:1px solid #00ffee;
+    box-shadow:0 0 15px rgba(0,255,255,0.3);
+}
+
+.bar {
+    width:220px;
+    height:18px;
+    background:#111;
+    border-radius:10px;
+    overflow:hidden;
+    margin-top:5px;
+}
+
+.fill {
+    height:100%;
+    background:#00ffee;
+}
+
+#crosshair {
+    position:absolute;
+    top:50%;
+    left:50%;
+    width:18px;
+    height:18px;
+    transform:translate(-50%,-50%);
+    border:2px solid #ff0055;
+    border-radius:50%;
+    z-index:20;
+}
+
+#gameover {
+    position:absolute;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    font-size:60px;
+    color:white;
+    background:rgba(0,0,0,0.8);
+    z-index:100;
+}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<div id="crosshair"></div>
+
+<div id="hud">
+    <div class="panel">
+        <div>PONTOS: <span id="score">0</span></div>
+    </div>
+
+    <div class="panel">
+        <div>VIDA</div>
+        <div class="bar">
+            <div class="fill" id="lifeBar"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div>ENERGIA</div>
+        <div class="bar">
+            <div class="fill" id="energyBar"></div>
+        </div>
+    </div>
+</div>
+
+<div id="gameover">GAME OVER</div>
+
+<script>
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050816);
+scene.fog = new THREE.Fog(0x050816, 20, 120);
+
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth/window.innerHeight,
+    0.1,
+    1000
+);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const ambient = new THREE.AmbientLight(0xffffff,0.35);
+scene.add(ambient);
+
+const light = new THREE.DirectionalLight(0x00ffff,1.5);
+light.position.set(10,25,10);
+light.castShadow = true;
+scene.add(light);
+
+const floorGeo = new THREE.PlaneGeometry(200,200);
+const floorMat = new THREE.MeshStandardMaterial({
+    color:0x111122,
+    metalness:0.4,
+    roughness:0.8
+});
+
+const floor = new THREE.Mesh(floorGeo,floorMat);
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const grid = new THREE.GridHelper(200,100,0x00ffff,0x222244);
+scene.add(grid);
+
+const player = new THREE.Group();
+
+const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2,2,2),
+    new THREE.MeshStandardMaterial({
+        color:0x00ffee,
+        emissive:0x003333
+    })
+);
+
+body.castShadow = true;
+player.add(body);
+
+player.position.y = 1;
+scene.add(player);
+
+camera.position.set(0,2,0);
+
+const keys = {};
+
+window.addEventListener('keydown',e=>{
+    keys[e.key.toLowerCase()] = true;
+
+    if(e.code === 'Space') shoot();
+});
+
+window.addEventListener('keyup',e=>{
+    keys[e.key.toLowerCase()] = false;
+});
+
+let yaw = 0;
+let pitch = 0;
+
+renderer.domElement.addEventListener('click',()=>{
+    renderer.domElement.requestPointerLock();
+});
+
+window.addEventListener('mousemove',e=>{
+    if(document.pointerLockElement !== renderer.domElement) return;
+
+    yaw -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+
+    pitch = Math.max(-1.4, Math.min(1.4,pitch));
+});
+
+const lasers = [];
+const enemies = [];
+const particles = [];
+
+let score = 0;
+let energy = 100;
+let life = 100;
+
+function createEnemy(){
+
+    const enemy = new THREE.Mesh(
+        new THREE.BoxGeometry(2,2,2),
+        new THREE.MeshStandardMaterial({
+            color:0xff0033,
+            emissive:0x330000
+        })
+    );
+
+    enemy.castShadow = true;
+
+    enemy.position.set(
+        (Math.random()-0.5)*80,
+        1,
+        (Math.random()-0.5)*80
+    );
+
+    enemy.userData.life = 3;
+
+    scene.add(enemy);
+    enemies.push(enemy);
+}
+
+for(let i=0;i<12;i++){
+    createEnemy();
+}
+
+function shoot(){
+
+    if(energy <= 5) return;
+
+    energy -= 5;
+
+    const laser = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08,0.08,1.2,8),
+        new THREE.MeshBasicMaterial({color:0xff0055})
+    );
+
+    laser.rotation.x = Math.PI/2;
+
+    laser.position.copy(camera.position);
+
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+
+    scene.add(laser);
+
+    lasers.push({
+        mesh:laser,
+        velocity:dir.clone().multiplyScalar(1.8)
+    });
+}
+
+function explosion(pos){
+
+    for(let i=0;i<20;i++){
+
+        const p = new THREE.Mesh(
+            new THREE.SphereGeometry(0.08,6,6),
+            new THREE.MeshBasicMaterial({color:0xffaa00})
+        );
+
+        p.position.copy(pos);
+
+        scene.add(p);
+
+        particles.push({
+            mesh:p,
+            velocity:new THREE.Vector3(
+                (Math.random()-0.5)*0.5,
+                Math.random()*0.5,
+                (Math.random()-0.5)*0.5
+            ),
+            life:60
+        });
+    }
+}
+
+function updatePlayer(){
+
+    const speed = keys['shift'] ? 0.35 : 0.18;
+
+    const forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    const right = new THREE.Vector3(forward.z,0,-forward.x);
+
+    if(keys['w']) player.position.add(forward.clone().multiplyScalar(speed));
+    if(keys['s']) player.position.add(forward.clone().multiplyScalar(-speed));
+    if(keys['a']) player.position.add(right.clone().multiplyScalar(speed));
+    if(keys['d']) player.position.add(right.clone().multiplyScalar(-speed));
+
+    camera.position.copy(player.position);
+    camera.position.y += 0.7;
+
+    const target = new THREE.Vector3(
+        Math.sin(yaw)*Math.cos(pitch),
+        Math.sin(pitch),
+        Math.cos(yaw)*Math.cos(pitch)
+    );
+
+    camera.lookAt(camera.position.clone().add(target));
+
+    energy += 0.12;
+    if(energy > 100) energy = 100;
+}
+
+function updateLasers(){
+
+    for(let i=lasers.length-1;i>=0;i--){
+
+        const l = lasers[i];
+
+        l.mesh.position.add(l.velocity);
+
+        for(let j=enemies.length-1;j>=0;j--){
+
+            const e = enemies[j];
+
+            if(l.mesh.position.distanceTo(e.position) < 1.5){
+
+                e.userData.life--;
+
+                explosion(e.position);
+
+                scene.remove(l.mesh);
+                lasers.splice(i,1);
+
+                if(e.userData.life <= 0){
+
+                    scene.remove(e);
+                    enemies.splice(j,1);
+
+                    score += 10;
+
+                    setTimeout(createEnemy,2000);
+                }
+
+                break;
+            }
+        }
+
+        if(l.mesh.position.length() > 200){
+            scene.remove(l.mesh);
+            lasers.splice(i,1);
+        }
+    }
+}
+
+function updateEnemies(){
+
+    enemies.forEach(enemy=>{
+
+        const dir = player.position.clone().sub(enemy.position);
+        dir.y = 0;
+        dir.normalize();
+
+        enemy.position.add(dir.multiplyScalar(0.04));
+
+        enemy.lookAt(player.position.x,1,player.position.z);
+
+        if(enemy.position.distanceTo(player.position) < 2){
+
+            life -= 0.15;
+
+            body.material.emissive.setHex(0x550000);
+
+            setTimeout(()=>{
+                body.material.emissive.setHex(0x003333);
+            },80);
+        }
+    });
+}
+
+function updateParticles(){
+
+    for(let i=particles.length-1;i>=0;i--){
+
+        const p = particles[i];
+
+        p.mesh.position.add(p.velocity);
+        p.life--;
+
+        p.mesh.scale.multiplyScalar(0.97);
+
+        if(p.life <= 0){
+            scene.remove(p.mesh);
+            particles.splice(i,1);
+        }
+    }
+}
+
+function updateHUD(){
+
+    document.getElementById('score').textContent = score;
+
+    document.getElementById('lifeBar').style.width = life + '%';
+    document.getElementById('energyBar').style.width = energy + '%';
+
+    if(life <= 0){
+        document.getElementById('gameover').style.display = 'flex';
+    }
+}
+
+function animate(){
+
+    requestAnimationFrame(animate);
+
+    updatePlayer();
+    updateLasers();
+    updateEnemies();
+    updateParticles();
+    updateHUD();
+
+    renderer.render(scene,camera);
+}
+
+animate();
+
+window.addEventListener('resize',()=>{
+
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+</script>
+</body>
+</html>
+```
+
+# Melhorias adicionadas
+
+* FPS em primeira pessoa
+* inimigos perseguindo jogador
+* explosões com partículas
+* sprint com SHIFT
+* HUD futurista
+* sistema de vida
+* game over
+* efeitos neon
+* mapa ampliado
+* atmosfera cyberpunk
+* múltiplos inimigos
+* respawn automático
+* mira central
+* iluminação melhorada
+* energia regenerativa
+
+# Próximas melhorias possíveis
+
+* sons reais
+* boss fight
+* multiplayer
+* minimapa
+* save game
+* armas avançadas
+* física real
+* mapas proceduralmente gerados
+* shaders avançados
+* bloom
+* drones voadores
+* IA avançada
