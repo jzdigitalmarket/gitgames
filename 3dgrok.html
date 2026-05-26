@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON ARENA - Sobreviva!</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0a0a14; font-family: 'Courier New', monospace; }
+        #canvas-container { width: 100vw; height: 100vh; }
+        
+        .ui-panel {
+            position: absolute; color: #fff; background: rgba(10, 10, 30, 0.92);
+            padding: 15px 20px; border-radius: 12px; border: 1px solid #00ffcc;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.4); pointer-events: none;
+        }
+        #ui-left { top: 20px; left: 20px; }
+        #ui-right { top: 20px; right: 20px; width: 260px; }
+        
+        #game-over {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(15, 0, 0, 0.97); padding: 50px 70px; border-radius: 20px;
+            border: 4px solid #ff0055; text-align: center; display: none;
+            box-shadow: 0 0 60px #ff0055; color: white;
+        }
+        button { 
+            margin-top: 25px; padding: 14px 40px; font-size: 20px; 
+            background: #00ffcc; color: #111; border: none; border-radius: 50px;
+            cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        button:hover { transform: scale(1.08); background: #00ccaa; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- UI -->
+    <div class="ui-panel" id="ui-left">
+        <h3>NEON ARENA</h3>
+        <div id="controls-text">
+            <strong>WASD</strong> - Mover<br>
+            <strong>ESPAÇO</strong> - Atirar Laser<br>
+            <strong>Mouse</strong> - Girar câmera (1ª pessoa)
+        </div>
+    </div>
+
+    <div class="ui-panel" id="ui-right">
+        <div>PONTOS: <span id="score-display" style="color:#ffff00; font-size:28px; font-weight:bold;">000</span></div>
+        <div style="margin:15px 0 6px; font-size:14px;">VIDA DO ROBÔ</div>
+        <div style="height:22px; background:#111; border:2px solid #444; border-radius:11px; overflow:hidden;">
+            <div id="health-bar" style="height:100%; width:100%; background:linear-gradient(90deg, #00ff88, #00ffcc);"></div>
+        </div>
+        <div style="margin:15px 0 6px; font-size:14px;">ENERGIA DO LASER</div>
+        <div style="height:16px; background:#111; border-radius:8px; overflow:hidden;">
+            <div id="energy-bar" style="height:100%; width:100%; background:#00ffcc; box-shadow:0 0 12px #00ffcc;"></div>
+        </div>
+        <div style="margin-top:10px; font-size:13px; color:#00ffcc;" id="wave">ONDA 1</div>
+    </div>
+
+    <button id="btn-camera" style="position:absolute; bottom:35px; left:50%; transform:translateX(-50%); z-index:100; padding:12px 28px; font-size:17px;">
+        Mudar para 1ª Pessoa
+    </button>
+
+    <div id="crosshair" style="display:none; position:absolute; top:50%; left:50%; width:26px; height:26px; transform:translate(-50%,-50%); pointer-events:none; border:2px solid #ff0055; border-radius:50%; opacity:0.7;"></div>
+
+    <div id="game-over">
+        <h2 style="color:#ff0055; margin:0 0 15px 0;">GAME OVER</h2>
+        <p style="font-size:22px;">Pontuação Final: <span id="final-score" style="color:#ffff00;"></span></p>
+        <button onclick="location.reload()">JOGAR NOVAMENTE</button>
+    </div>
+
+    <script>
+        // ==================== SETUP ====================
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0a0a14, 0.017);
+        scene.background = new THREE.Color(0x0a0a14);
+
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Iluminação
+        scene.add(new THREE.AmbientLight(0x4455ff, 0.5));
+        const dirLight = new THREE.DirectionalLight(0xaaffff, 1.2);
+        dirLight.position.set(15, 50, 25);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Chão
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(100, 100),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a2a, roughness: 0.85 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(100, 50, 0x00ffcc, 0x112233);
+        grid.position.y = 0.02;
+        scene.add(grid);
+
+        // ==================== JOGADOR ====================
+        let score = 0, health = 100, energy = 100, wave = 1, gameOver = false;
+        let isOverheated = false;
+
+        const playerGroup = new THREE.Group();
+        const playerBody = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, 3, 2.4),
+            new THREE.MeshStandardMaterial({ color: 0x00ddff, metalness: 0.8, roughness: 0.2 })
+        );
+        playerBody.castShadow = true;
+        playerGroup.add(playerBody);
+        playerGroup.position.y = 1.5;
+        scene.add(playerGroup);
+
+        const playerBox = new THREE.Box3();
+
+        // ==================== INIMIGOS ====================
+        const enemies = [];
+
+        function createEnemy() {
+            const enemy = new THREE.Group();
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(2.2, 2.6, 2.2),
+                new THREE.MeshStandardMaterial({ color: 0xff2244, emissive: 0x440000 })
+            );
+            enemy.add(body);
+            enemy.position.set(
+                (Math.random() - 0.5) * 70,
+                1.3,
+                (Math.random() - 0.5) * 70
+            );
+            scene.add(enemy);
+            enemies.push({
+                mesh: enemy,
+                health: 2 + Math.floor(wave / 2),
+                lastShot: Date.now()
+            });
+        }
+
+        // ==================== TIROS E EXPLOSÕES ====================
+        const lasers = [];
+        const particles = [];
+
+        function createExplosion(pos) {
+            for (let i = 0; i < 35; i++) {
+                const p = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.2, 6, 6),
+                    new THREE.MeshBasicMaterial({ color: Math.random() > 0.6 ? 0xff8800 : 0xffff44 })
+                );
+                p.position.copy(pos);
+                p.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.2,
+                    Math.random() * 1.2 + 0.5,
+                    (Math.random() - 0.5) * 1.2
+                );
+                p.life = 45;
+                scene.add(p);
+                particles.push(p);
+            }
+            playSound(120, 0.4, 'sawtooth');
+        }
+
+        function fireLaser() {
+            if (isOverheated || energy < 14 || gameOver) return;
+            energy -= 14;
+
+            const laser = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.09, 0.09, 3, 8),
+                new THREE.MeshBasicMaterial({ color: 0x00ffff })
+            );
+
+            if (cameraMode === '3P') {
+                laser.position.copy(playerGroup.position);
+                laser.position.y += 1.2;
+                laser.userData.dir = new THREE.Vector3(0, 0, -1).applyQuaternion(playerGroup.quaternion);
+            } else {
+                laser.position.copy(camera.position);
+                camera.getWorldDirection(laser.userData.dir);
+            }
+
+            scene.add(laser);
+            lasers.push(laser);
+            playSound(950, 0.08, 'square');
+        }
+
+        // ==================== ÁUDIO ====================
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(freq, duration, type = 'square') {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.value = 0.25;
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        // ==================== CONTROLES ====================
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.code === "Space") { e.preventDefault(); fireLaser(); }
+        });
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+        // ==================== CÂMERA ====================
+        let cameraMode = '3P';
+        const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+        orbitControls.enableDamping = true;
+        let fpYaw = Math.PI, fpPitch = 0;
+
+        document.getElementById('btn-camera').addEventListener('click', () => {
+            if (cameraMode === '3P') renderer.domElement.requestPointerLock();
+            else document.exitPointerLock();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement) {
+                cameraMode = '1P';
+                document.getElementById('crosshair').style.display = 'block';
+                document.getElementById('btn-camera').textContent = 'Voltar para 3ª Pessoa';
+            } else {
+                cameraMode = '3P';
+                document.getElementById('crosshair').style.display = 'none';
+                document.getElementById('btn-camera').textContent = 'Mudar para 1ª Pessoa';
+            }
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (cameraMode !== '1P' || gameOver) return;
+            fpYaw -= e.movementX * 0.002;
+            fpPitch -= e.movementY * 0.002;
+            fpPitch = Math.max(-1.3, Math.min(1.3, fpPitch));
+        });
+
+        // ==================== LOOP PRINCIPAL ====================
+        function updateGame() {
+            if (gameOver) return;
+
+            // Movimento do jogador
+            const speed = 0.28;
+            if (keys['w']) playerGroup.translateZ(-speed);
+            if (keys['s']) playerGroup.translateZ(speed);
+            if (keys['a']) playerGroup.translateX(-speed);
+            if (keys['d']) playerGroup.translateX(speed);
+
+            playerGroup.position.x = Math.max(-45, Math.min(45, playerGroup.position.x));
+            playerGroup.position.z = Math.max(-45, Math.min(45, playerGroup.position.z));
+
+            // Recarga de energia
+            if (energy < 100) energy += 0.55;
+            if (energy > 100) energy = 100;
+            document.getElementById('energy-bar').style.width = energy + '%';
+
+            if (energy <= 0) isOverheated = true;
+            if (energy > 25) isOverheated = false;
+
+            // Atualizar lasers
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                const l = lasers[i];
+                l.position.addScaledVector(l.userData.dir, 1.1);
+
+                let hit = false;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    if (l.position.distanceTo(enemy.mesh.position) < 2.5) {
+                        enemy.health--;
+                        hit = true;
+                        if (enemy.health <= 0) {
+                            createExplosion(enemy.mesh.position);
+                            scene.remove(enemy.mesh);
+                            enemies.splice(j, 1);
+                            score += 20;
+                        }
+                        break;
+                    }
+                }
+
+                if (hit || l.position.length() > 120) {
+                    scene.remove(l);
+                    lasers.splice(i, 1);
+                }
+            }
+
+            // Atualizar inimigos
+            enemies.forEach(enemy => {
+                const dir = new THREE.Vector3().subVectors(playerGroup.position, enemy.mesh.position).normalize();
+                enemy.mesh.position.addScaledVector(dir, 0.12);
+
+                // Inimigo atira
+                if (Date.now() - enemy.lastShot > 1200) {
+                    if (enemy.mesh.position.distanceTo(playerGroup.position) < 35) {
+                        health -= 8;
+                        enemy.lastShot = Date.now();
+                        playSound(200, 0.3, 'sawtooth');
+                    }
+                }
+            });
+
+            // Atualizar partículas
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.position.add(p.velocity);
+                p.velocity.y -= 0.04;
+                p.life--;
+                p.scale.setScalar(p.life / 45);
+                if (p.life <= 0) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Atualizar UI
+            document.getElementById('score-display').textContent = String(score).padStart(3, '0');
+            document.getElementById('health-bar').style.width = health + '%';
+            document.getElementById('wave').textContent = `ONDA ${wave}`;
+
+            if (health <= 0) {
+                gameOver = true;
+                document.getElementById('final-score').textContent = score;
+                document.getElementById('game-over').style.display = 'block';
+            }
+
+            // Nova onda
+            if (enemies.length === 0) {
+                wave++;
+                for (let i = 0; i < 6 + wave * 2; i++) createEnemy();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            updateGame();
+
+            if (cameraMode === '3P') {
+                orbitControls.target.copy(playerGroup.position);
+                orbitControls.update();
+            } else {
+                camera.position.copy(playerGroup.position);
+                camera.position.y += 2;
+                const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(fpPitch, fpYaw, 0, 'YXZ'));
+                camera.lookAt(camera.position.clone().add(lookDir));
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Iniciar jogo
+        for (let i = 0; i < 8; i++) createEnemy();
+        camera.position.set(0, 18, 35);
+        orbitControls.target.set(0, 0, 0);
+
+        animate();
+
+        // Responsivo
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
