@@ -1,0 +1,292 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;700;900&display=swap');
+  :root{--cell:68px;--gap:6px;}
+  #root{font-family:'Nunito',sans-serif;max-width:530px;margin:0 auto;padding:1rem 0.5rem 2rem;user-select:none;}
+  h1.title{font-family:'Bangers',cursive;font-size:2.8rem;letter-spacing:3px;text-align:center;margin:0 0 0.1rem;color:var(--color-text-primary);}
+  .subtitle{text-align:center;font-size:12px;color:var(--color-text-secondary);margin-bottom:0.9rem;}
+  .top-bar{display:flex;justify-content:space-between;gap:6px;margin-bottom:0.8rem;}
+  .pill{flex:1;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:5px 10px;font-size:12px;color:var(--color-text-secondary);text-align:center;}
+  .pill strong{display:block;font-size:1.1rem;font-weight:700;color:var(--color-text-primary);font-family:'Bangers',cursive;letter-spacing:1px;}
+  .board-wrap{display:flex;gap:14px;justify-content:center;align-items:flex-start;}
+  .grid{display:grid;grid-template-columns:repeat(3,var(--cell));grid-template-rows:repeat(6,var(--cell));gap:var(--gap);flex-shrink:0;}
+  .cell{width:var(--cell);height:var(--cell);border-radius:10px;background:var(--color-background-secondary);border:2px solid var(--color-border-secondary);display:flex;align-items:center;justify-content:center;font-family:'Bangers',cursive;font-size:2rem;cursor:pointer;transition:background 0.1s,border-color 0.1s,transform 0.08s;color:var(--color-text-primary);position:relative;}
+  .cell .seq-badge{position:absolute;top:3px;right:5px;font-family:'Nunito',sans-serif;font-size:10px;font-weight:900;color:#fff;background:#378ADD;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;}
+  .cell:hover:not(.in-sel){background:var(--color-background-info);border-color:#378ADD;transform:scale(1.05);}
+  .cell.in-sel{background:#378ADD;border-color:#185FA5;color:#fff;transform:scale(1.07);}
+  .cell.in-sel:hover{background:#185FA5;}
+  .cell.flash-err{animation:ferr 0.35s ease;}
+  .cell.used-flash{animation:fused 0.65s ease forwards;}
+  @keyframes ferr{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+  @keyframes fused{0%{background:#639922;border-color:#3B6D11;color:#fff}60%{background:#639922;border-color:#3B6D11;color:#fff}100%{background:var(--color-background-secondary);border-color:var(--color-border-secondary);color:var(--color-text-primary)}}
+  .side{display:flex;flex-direction:column;gap:8px;min-width:148px;max-width:160px;}
+  .word-box{border:2px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:7px 9px;min-height:50px;background:var(--color-background-primary);font-family:'Bangers',cursive;font-size:1.7rem;letter-spacing:2px;color:var(--color-text-primary);display:flex;align-items:center;flex-wrap:wrap;gap:3px;position:relative;}
+  .word-box.empty::after{content:'clique nas letras';font-family:'Nunito',sans-serif;font-size:11px;color:var(--color-text-tertiary);font-style:italic;position:absolute;left:9px;letter-spacing:0;font-weight:400;}
+  .chip{background:#378ADD;color:#fff;border-radius:6px;padding:0 5px;font-size:1.4rem;cursor:pointer;transition:background 0.1s;line-height:1.3;}
+  .chip:hover{background:#185FA5;}
+  .feedback{font-size:12px;min-height:16px;text-align:center;font-weight:700;color:var(--color-text-danger);}
+  .feedback.ok{color:var(--color-text-success);}
+  .feedback.loading{color:var(--color-text-secondary);font-weight:400;font-style:italic;}
+  .btn-row{display:flex;gap:5px;}
+  button.btn{flex:1;padding:8px 4px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;cursor:pointer;color:var(--color-text-primary);transition:background 0.1s;}
+  button.btn:hover{background:var(--color-background-secondary);}
+  button.btn:disabled{opacity:0.5;cursor:not-allowed;}
+  button.btn.primary{background:#378ADD;color:#fff;border-color:#185FA5;}
+  button.btn.primary:hover:not(:disabled){background:#185FA5;}
+  .rules-box{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:7px 9px;font-size:11px;color:var(--color-text-secondary);line-height:1.65;}
+  .rules-box strong{color:var(--color-text-primary);display:block;margin-bottom:2px;font-size:11.5px;}
+  #new-btn{width:100%;padding:8px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;cursor:pointer;color:var(--color-text-primary);}
+  #new-btn:hover{background:var(--color-background-tertiary);}
+  .words-found{margin-top:1rem;border-top:0.5px solid var(--color-border-tertiary);padding-top:0.8rem;}
+  .words-found h3{font-size:11px;color:var(--color-text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px;}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;}
+  .tag{background:var(--color-background-success);color:var(--color-text-success);border-radius:var(--border-radius-md);padding:2px 9px;font-size:13px;font-weight:700;font-family:'Bangers',cursive;letter-spacing:1px;}
+  .method-badge{text-align:center;font-size:10px;color:var(--color-text-tertiary);margin-top:2px;}
+</style>
+
+<div id="root">
+  <h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Jogo Torto — forme palavras conectando letras adjacentes na grade 3×6</h2>
+  <h1 class="title">TORTO</h1>
+  <p class="subtitle">Grade 3×6 · Letras adjacentes · Validação por dicionário</p>
+  <div class="top-bar">
+    <div class="pill">Pontos<strong id="s-score">0</strong></div>
+    <div class="pill">Palavras<strong id="s-words">0</strong></div>
+    <div class="pill">Melhor<strong id="s-best">—</strong></div>
+  </div>
+  <div class="board-wrap">
+    <div class="grid" id="grid"></div>
+    <div class="side">
+      <div class="word-box empty" id="wbox"></div>
+      <div class="feedback" id="fb"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="ok-btn" onclick="confirmWord()">✓ Ok</button>
+        <button class="btn" onclick="clearSel()">✕ Limpar</button>
+      </div>
+      <div class="rules-box">
+        <strong>Regras</strong>
+        ● Mínimo 3 letras<br>
+        ● Letras adjacentes (H, V ou diagonal)<br>
+        ● Letras podem ser reutilizadas<br>
+        ● Palavra não pode se repetir<br>
+        ● Qualquer forma válida em português<br>
+        ● +1 pt por letra da palavra
+      </div>
+      <button id="new-btn" onclick="newGame()">🔀 Novo jogo</button>
+      <div class="method-badge" id="method-badge">validação: inicializando…</div>
+    </div>
+  </div>
+  <div class="words-found">
+    <h3>Palavras encontradas</h3>
+    <div class="tags" id="tags"></div>
+  </div>
+</div>
+
+<script>
+const BOARDS=[
+  ['C','A','S','O','L','E','T','R','A','D','O','S','M','I','P','U','N','E'],
+  ['P','A','R','T','I','D','O','C','E','L','U','M','B','A','N','S','O','I'],
+  ['V','I','N','H','O','S','C','A','L','T','E','M','P','O','R','A','D','A'],
+  ['F','E','S','T','A','R','I','O','D','N','U','B','E','L','C','A','M','P'],
+  ['M','A','R','E','C','H','O','T','A','B','U','L','E','I','R','O','N','S'],
+  ['C','O','R','P','O','S','A','L','T','E','M','U','N','D','I','F','G','A'],
+  ['B','O','L','A','D','E','N','E','V','E','C','A','I','U','S','O','F','T'],
+  ['G','A','T','O','P','R','E','T','O','C','A','M','I','N','H','A','V','A'],
+];
+
+let letters=[],sel=[],found=new Set(),score=0,bestWord='',validating=false;
+const cache=new Map();
+let validationMethod='wiktionary';
+
+const row=i=>Math.floor(i/3);
+const col=i=>i%3;
+const adj=(a,b)=>Math.abs(row(a)-row(b))<=1&&Math.abs(col(a)-col(b))<=1&&a!==b;
+
+// Testa qual método está disponível
+async function detectMethod(){
+  try{
+    const r=await fetchWiktionary('mar');
+    if(r){validationMethod='wiktionary';setMethodBadge('wikcionário (PT)');return;}
+  }catch(e){}
+  validationMethod='claude';
+  setMethodBadge('IA (fallback)');
+}
+
+function setMethodBadge(txt){
+  document.getElementById('method-badge').textContent='validação: '+txt;
+}
+
+// Wikcionário PT — REST API v1, suporta CORS
+async function fetchWiktionary(word){
+  const url=`https://pt.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`;
+  const r=await fetch(url,{headers:{accept:'application/json'}});
+  if(r.status===404)return false;
+  if(!r.ok)throw new Error('wikt_err');
+  const data=await r.json();
+  // retorna objeto com seções de língua; se tiver "pt" ou qualquer entrada, é válida
+  return data&&Object.keys(data).length>0;
+}
+
+// Fallback: Claude API
+async function fetchClaude(word){
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:5,
+      system:`Dicionário PT-BR. Responda SOMENTE: SIM ou NAO.
+Aceite qualquer forma: verbos conjugados, plurais, diminutivos, etc.`,
+      messages:[{role:'user',content:`"${word}" existe em português?`}]
+    })
+  });
+  const data=await r.json();
+  const txt=(data?.content?.[0]?.text||'').toUpperCase().replace(/[^A-Z]/g,'');
+  return txt==='SIM';
+}
+
+async function validateWord(word){
+  // Primeiro tenta Wikcionário
+  try{
+    const found=await fetchWiktionary(word);
+    setMethodBadge('wikcionário (PT)');
+    return found;
+  }catch(e){
+    // Se Wikcionário falhar por qualquer motivo, cai no Claude
+    setMethodBadge('IA (fallback)');
+    try{ return await fetchClaude(word); }
+    catch(e2){ return false; }
+  }
+}
+
+function newGame(){
+  letters=[...BOARDS[Math.floor(Math.random()*BOARDS.length)]];
+  sel=[];found=new Set();score=0;bestWord='';
+  document.getElementById('tags').innerHTML='';
+  renderGrid();renderWord();updateStats();setFb('','');
+}
+
+function renderGrid(){
+  const g=document.getElementById('grid');g.innerHTML='';
+  letters.forEach((l,i)=>{
+    const d=document.createElement('div');
+    d.className='cell';d.onclick=()=>clickCell(i);d.textContent=l;
+    g.appendChild(d);
+  });
+  refreshCells();
+}
+
+const getCells=()=>document.querySelectorAll('.cell');
+
+function refreshCells(){
+  getCells().forEach((c,i)=>{
+    c.className='cell';
+    const pos=sel.indexOf(i);
+    if(pos!==-1){
+      c.classList.add('in-sel');
+      let b=c.querySelector('.seq-badge');
+      if(!b){b=document.createElement('span');b.className='seq-badge';c.appendChild(b);}
+      b.textContent=pos+1;
+    } else { const b=c.querySelector('.seq-badge');if(b)b.remove(); }
+  });
+}
+
+function renderWord(){
+  const box=document.getElementById('wbox');
+  box.innerHTML='';
+  if(!sel.length){box.classList.add('empty');return;}
+  box.classList.remove('empty');
+  sel.forEach((idx,pos)=>{
+    const chip=document.createElement('span');
+    chip.className='chip';chip.textContent=letters[idx];
+    chip.onclick=e=>{
+      e.stopPropagation();
+      if(pos===sel.length-1){sel.pop();refreshCells();renderWord();}
+      else setFb('Só pode remover a última letra!','err');
+    };
+    box.appendChild(chip);
+  });
+}
+
+function clickCell(i){
+  if(validating)return;
+  const pos=sel.indexOf(i);
+  if(pos!==-1){
+    if(pos===sel.length-1)sel.pop();
+    else{setFb('Só pode remover a última letra!','err');return;}
+    refreshCells();renderWord();return;
+  }
+  if(sel.length>0&&!adj(sel[sel.length-1],i)){
+    setFb('Letra não é adjacente!','err');flashCells([i],'flash-err');return;
+  }
+  sel.push(i);setFb('','');refreshCells();renderWord();
+}
+
+function clearSel(){
+  if(validating)return;
+  sel=[];refreshCells();renderWord();setFb('','');
+}
+
+async function confirmWord(){
+  if(validating)return;
+  if(sel.length<3){setFb('Mínimo 3 letras!','err');return;}
+  const word=sel.map(i=>letters[i]).join('').toLowerCase();
+  const wordUp=word.toUpperCase();
+  if(found.has(wordUp)){setFb('Palavra já encontrada!','err');flashCells([...sel],'flash-err');return;}
+
+  validating=true;
+  document.getElementById('ok-btn').disabled=true;
+  setFb('Verificando…','loading');
+
+  let valid=false;
+  if(cache.has(word)){
+    valid=cache.get(word);
+  } else {
+    valid=await validateWord(word);
+    cache.set(word,valid);
+  }
+
+  validating=false;
+  document.getElementById('ok-btn').disabled=false;
+
+  if(!valid){
+    setFb(`"${wordUp}" não encontrada no dicionário.`,'err');
+    flashCells([...sel],'flash-err');return;
+  }
+
+  found.add(wordUp);
+  score+=word.length;
+  if(word.length>bestWord.length)bestWord=wordUp;
+  const done=[...sel];sel=[];
+  flashCells(done,'used-flash',()=>{refreshCells();renderWord();});
+  addTag(wordUp,word.length);
+  updateStats();
+  setFb(`+${word.length} pontos!`,'ok');
+}
+
+function flashCells(indices,cls,cb){
+  const cs=getCells();
+  indices.forEach(i=>{if(cs[i])cs[i].classList.add(cls);});
+  setTimeout(()=>{indices.forEach(i=>{if(cs[i])cs[i].classList.remove(cls);});if(cb)cb();},680);
+}
+
+function addTag(word,len){
+  const t=document.createElement('span');
+  t.className='tag';t.textContent=`${word} (${len})`;
+  document.getElementById('tags').prepend(t);
+}
+
+function updateStats(){
+  document.getElementById('s-score').textContent=score;
+  document.getElementById('s-words').textContent=found.size;
+  document.getElementById('s-best').textContent=bestWord||'—';
+}
+
+function setFb(msg,type){
+  const el=document.getElementById('fb');
+  el.textContent=msg;
+  el.className='feedback'+(type?' '+type:'');
+  if(msg&&type!=='loading')setTimeout(()=>{if(el.textContent===msg)el.textContent='';},2500);
+}
+
+detectMethod().then(()=>newGame());
+</script>
