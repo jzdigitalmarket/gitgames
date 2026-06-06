@@ -1,0 +1,595 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;700;900&display=swap');
+
+  :root {
+    --cell-size: 68px;
+    --gap: 6px;
+  }
+
+  #torto-root {
+    font-family: 'Nunito', sans-serif;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 1rem 0.5rem 2rem;
+    user-select: none;
+  }
+
+  #torto-root h1 {
+    font-family: 'Bangers', cursive;
+    font-size: 2.8rem;
+    letter-spacing: 3px;
+    text-align: center;
+    margin: 0 0 0.2rem;
+    color: var(--color-text-primary);
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 1rem;
+  }
+
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+    gap: 8px;
+  }
+
+  .stat-pill {
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 6px 14px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .stat-pill strong {
+    color: var(--color-text-primary);
+    font-weight: 700;
+  }
+
+  .board-wrap {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, var(--cell-size));
+    grid-template-rows: repeat(6, var(--cell-size));
+    gap: var(--gap);
+  }
+
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border-radius: 10px;
+    background: var(--color-background-secondary);
+    border: 2px solid var(--color-border-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bangers', cursive;
+    font-size: 2rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.08s;
+    position: relative;
+    color: var(--color-text-primary);
+  }
+
+  .cell:hover:not(.used) {
+    background: var(--color-background-info);
+    border-color: #378ADD;
+    transform: scale(1.06);
+  }
+
+  .cell.selected {
+    background: #378ADD;
+    border-color: #185FA5;
+    color: #fff;
+    transform: scale(1.08);
+  }
+
+  .cell.used {
+    background: var(--color-background-tertiary);
+    border-color: var(--color-border-tertiary);
+    color: var(--color-text-tertiary);
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .cell.flash-ok {
+    background: #639922 !important;
+    border-color: #3B6D11 !important;
+    color: #fff !important;
+    animation: flashOk 0.4s ease;
+  }
+
+  .cell.flash-err {
+    animation: flashErr 0.3s ease;
+  }
+
+  @keyframes flashOk {
+    0%   { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes flashErr {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  .word-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 150px;
+    max-width: 170px;
+  }
+
+  .current-word-box {
+    border: 2px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 10px;
+    min-height: 48px;
+    background: var(--color-background-primary);
+    font-family: 'Bangers', cursive;
+    font-size: 1.8rem;
+    letter-spacing: 2px;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+
+  .current-word-box .letter-chip {
+    background: #378ADD;
+    color: #fff;
+    border-radius: 6px;
+    padding: 0 5px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .current-word-box .letter-chip:hover {
+    background: #185FA5;
+  }
+
+  .current-word-box.empty-hint::after {
+    content: 'clique nas letras';
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    font-style: italic;
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    letter-spacing: 0;
+  }
+
+  .rules-box {
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 10px;
+    font-size: 11.5px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  .rules-box strong {
+    color: var(--color-text-primary);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 12px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  button.action-btn {
+    flex: 1;
+    padding: 8px 6px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-primary);
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--color-text-primary);
+    transition: background 0.12s;
+  }
+
+  button.action-btn:hover { background: var(--color-background-secondary); }
+
+  button.action-btn.primary {
+    background: #378ADD;
+    color: #fff;
+    border-color: #185FA5;
+  }
+
+  button.action-btn.primary:hover { background: #185FA5; }
+
+  button.action-btn.danger {
+    background: var(--color-background-danger);
+    color: var(--color-text-danger);
+    border-color: var(--color-border-danger);
+  }
+
+  .words-found {
+    margin-top: 1rem;
+    border-top: 0.5px solid var(--color-border-tertiary);
+    padding-top: 0.8rem;
+  }
+
+  .words-found h3 {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+
+  .word-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .word-tag {
+    background: var(--color-background-success);
+    color: var(--color-text-success);
+    border-radius: var(--border-radius-md);
+    padding: 3px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    font-family: 'Bangers', cursive;
+  }
+
+  .feedback {
+    font-size: 12px;
+    min-height: 18px;
+    text-align: center;
+    font-weight: 700;
+    color: var(--color-text-danger);
+    transition: color 0.2s;
+  }
+
+  .feedback.ok { color: var(--color-text-success); }
+
+  .score-big {
+    font-family: 'Bangers', cursive;
+    font-size: 1.5rem;
+    color: var(--color-text-primary);
+  }
+
+  #new-game-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 10px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-secondary);
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--color-text-primary);
+  }
+
+  #new-game-btn:hover { background: var(--color-background-tertiary); }
+</style>
+
+<div id="torto-root">
+  <h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Jogo Torto — forme palavras usando letras adjacentes na grade 3x6</h2>
+  <h1>TORTO</h1>
+  <p class="subtitle">Grade 3×6 · Conecte letras adjacentes para formar palavras</p>
+
+  <div class="top-bar">
+    <div class="stat-pill">Pontos <strong id="score-val">0</strong></div>
+    <div class="stat-pill">Palavras <strong id="words-count">0</strong></div>
+    <div class="stat-pill">Maiores <strong id="best-word">—</strong></div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="grid" id="grid"></div>
+
+    <div class="word-input-area">
+      <div class="current-word-box empty-hint" id="word-display"></div>
+      <div class="feedback" id="feedback"></div>
+      <div class="btn-row">
+        <button class="action-btn primary" onclick="confirmWord()">✓ Ok</button>
+        <button class="action-btn" onclick="clearSelection()">✕ Limpar</button>
+      </div>
+      <div class="rules-box">
+        <strong>Regras</strong>
+        ● Mínimo 3 letras<br>
+        ● Letras adjacentes (H, V ou diagonal)<br>
+        ● Cada letra usada 1 vez<br>
+        ● Palavras em português<br>
+        ● +1 pt por letra encontrada
+      </div>
+      <button id="new-game-btn" onclick="newGame()">🔀 Novo jogo</button>
+    </div>
+  </div>
+
+  <div class="words-found">
+    <h3>Palavras encontradas</h3>
+    <div class="word-tags" id="word-tags"></div>
+  </div>
+</div>
+
+<script>
+const BOARDS = [
+  ['C','A','S','O','L','E','T','R','A','D','O','S','M','I','P','U','N','E'],
+  ['P','A','R','T','I','D','O','C','E','L','U','M','B','A','N','S','O','I'],
+  ['V','I','N','H','O','S','C','A','L','T','E','M','P','O','R','A','D','A'],
+  ['F','E','S','T','A','R','I','O','D','N','U','B','E','L','C','A','M','P'],
+  ['M','A','R','E','C','H','O','T','A','B','U','L','E','I','R','O','N','S'],
+  ['C','O','R','P','O','S','A','L','T','E','M','U','N','D','I','F','G','A'],
+];
+
+const WORD_LIST = new Set([
+  'sol','lua','mar','rio','lar','ato','ovo','elo','era','asa','uva','cal','sal','luz','boa','voz','bem','mil','par','paz','fé',
+  'calo','sale','tela','alvo','dado','lema','amor','arco','belo','boca','cabo','cama','cana','cara','caso','chão','copo','coro',
+  'corte','corpo','dama','data','dedo','dica','dona','dose','duna','duna','fada','fala','fama','faro','fato','figa','fila','fita',
+  'fogo','folha','fome','ford','forno','foto','gala','galo','gama','gato','gelo','gema','giro','gola','gota','grão','gula',
+  'hino','hora','ilha','item','jato','jogo','lata','leio','lema','lena','lida','lima','liso','lista','lona','lote','luto',
+  'maca','mala','male','mana','mapa','mare','mata','mato','mato','medo','mela','melo','mera','meta','mico','mila','mina',
+  'mito','moco','moda','modo','moio','mola','mole','mono','mora','moro','mota','mote','mudo','mula','mula','mulo','muro',
+  'nata','neto','nodo','nora','nota','nubo','nuca','nulo','nulo','nuto','obra','oito','olha','onda','oral','orbe','orla',
+  'orna','orra','osso','ouço','ouro','ousa','oval','paca','pace','pado','pala','pale','palha','palo','papa','pele','pelo',
+  'pena','pera','peru','pico','pila','pilo','pino','pior','pipa','pire','pito','plan','plano','polo','pomo','poro','pote',
+  'povo','pulo','puma','puro','rabo','raça','rade','rado','raio','ramo','rana','rano','rapa','raro','rata','rato','real',
+  'rede','rela','remo','rena','repo','reta','rico','rima','ripa','riso','roba','roca','roda','roça','rolo','roma','ronda',
+  'rosa','rota','ruca','ruco','ruma','rumo','runa','runo','rura','ruro','sala','saio','salo','sano','sapo','sara','seta',
+  'sino','sopa','sota','sote','soto','souk','souo','taco','tala','talo','taio','tapa','tara','taro','taxa','teca','tema',
+  'temo','tera','tero','tia','timo','tina','tipo','tiro','toca','toce','toco','tona','tono','topo','tora','torá','toro',
+  'torto','touca','touça','toza','trea','teco','trio','troca','troco','tuco','tuna','tuno','turma','unco','urea','urge',
+  'urna','urso','usar','vaga','vale','valo','vana','vano','vara','vari','varo','vaso','vate','vato','veda','vela','velo',
+  'vena','veno','vera','vero','veta','veto','veza','viço','vida','vila','vime','vino','viola','vira','vire','virei','viro',
+  'visa','viso','vite','vito','voar','voga','vola','volo','vora','voto',
+  'amar','amor','anel','anjo','anos','arma','arte','ator','azul','bala','bana','bans','boia','bola','bolo','bons','bora',
+  'bote','brio','cale','calm','calo','cama','cant','capa','cape','caro','cart','cata','cate','cato','cave','ceia','cela',
+  'celo','ceio','cepa','cera','cero','ceto','cima','cimo','cine','cion','cipo','cire','cito','clam','claro','cob','coco',
+  'coio','cola','colo','come','como','cone','copa','core','corn','coro','coroa','corte','coste','cota','cote','coto',
+  'dama','dame','dano','dara','daro','data','dava','deca','dedo','dela','dele','deli','delo','dema','demi','demo','dena',
+  'dene','deni','deno','dens','dica','dice','dire','diro','dita','dito','diva','dive','divo','doia','dolo','dona','done',
+  'dono','dora','dore','doro','dosa','dose','dota','dote','doto','duna',
+  'elmo','elo','erro','esmo','esta','este','esto',
+  'pato','pelo','pena','peso','pico','pilo','pino','pior','pipa','plano','polo','pote','povo',
+  'ralo','rame','ramo','rano','rapa','raro','rato','rede','rela','remo','reta','rico','rima','riso','roda','rolo','rosa',
+  'sala','sale','saio','sapo','sara','seta','sino','sopa',
+  'caixa','campo','canto','cargo','carta','carma','carne','carro','causa','coisa','colmo','coral','corda','couve',
+  'crime','cruel','crise','custo','dança','disco','douro','duelo','dulce','dunas','espio','farol','favor','feira','ferro',
+  'filho','flora','flor','força','forte','fosso','fraca','frame','frota','fundo','funil','furto','garra','garça','gleba',
+  'globo','glosa','golpe','grade','grana','greve','grupo','guia','guile','guisa','halto','haste','hiena','honra','hotel',
+  'humor','ícone','ideia','igual','imune','índio','inerte','insto','intro','irmão','junto','juros','lapso','largo','lasca',
+  'latim','lebre','lenha','lento','lerdo','letro','levar','lição','ligma','limão','limbo','linho','lismo','litro','livro',
+  'local','longe','lorpa','lotes','louça','louvo','lugar','lunar','lusco','lutar','malha','mamba','mambo','manso','manta',
+  'marfim','mario','mármore','marco','marso','massa','macho','molho','monge','monte','morto','moça','moita','moço','moeda',
+  'molde','mundo','murta','musgo','namoro','nobre','norte','nossa','novas','novos','nuvem','nossa','parma','pasta','pausa',
+  'pedra','pelam','perda','perna','perto','piada','pilha','pilão','pinça','pingo','pinho','piora','pirão','pisca','pivete',
+  'placa','plena','pleno','poema','poise','polvo','pomba','ponte','porca','porta','posto','potro','poupa','praça','prado',
+  'praia','prata','preza','primo','prova','pulga','punho','purga','queda','queijo','ranca','range','rapto','raspa','rasgo',
+  'razão','redor','refém','regra','reino','repor','resta','risco','robos','rocha','ronda','ronco','rosca','rosto','rotam',
+  'ruína','rugir','safra','salmo','salsa','salva','samba','sanar','sanha','sanho','santa','sarda','serpe','senso','serra',
+  'servo','sigma','silva','sinco','sirvo','sodio','sojão','solda','solar','solto','sonda','sopro','sorte','sulco','sumiu',
+  'surdo','surge','tacha','talho','tampo','tanga','tarde','tarso','taxas','tecla','tempo','tenda','tenso','terca','termo',
+  'terno','terco','tigre','timão','tirar','tirso','toldo','torna','torço','torso','tosco','total','touro','traça','trama',
+  'tramo','trança','trave','trego','trela','trete','trevo','tribu','trigo','tropa','trova','trova','truque','tubos','tumor',
+  'turco','ultra','umbro','unção','único','único','urdir','usina','usura','valor','valsa','valva','vamos','vanda','vante',
+  'vapor','veado','venha','vento','verde','verga','verso','viela','vigor','viola','virar','virga','viril','vista','vital',
+  'volta','vomita','vonga','vorta','vosso','vulto',
+  'casol','oleto','letar','trado','trads','salto','alter','terra','mirpo','nipue','trias','solto',
+  'calo','oles','letos','alets','rads','oleta','salos','oles','etras',
+  'part','arti','rtid','tido','ocel','celu','elum','lumb','umba','bans','anso','nsoi',
+  'vinh','inho','nhos','hosc','osal','calc','alte','ltem','temp','empi','mpor','pora','orad','rada',
+  'este','fes','feta','etar','tarj','arjo','rjod','jodj','odu','dunb','unbe','nbel','belc','elca','lcam','camp',
+  'mar','are','rec','ech','cho','hot','ota','tab','abu','bul','ule','lei','eir','iro','ron','ons',
+  'cor','orp','rpo','pos','osa','sal','alt','lte','tem','emu','mun','und','ndi','dif','ifg','fga','ga',
+]);
+
+let cells = [];
+let selectedIndices = [];
+let usedIndices = [];
+let words = [];
+let score = 0;
+let boardLetters = [];
+let bestWord = '';
+
+function getRow(i) { return Math.floor(i / 3); }
+function getCol(i) { return i % 3; }
+
+function areAdjacent(a, b) {
+  return Math.abs(getRow(a) - getRow(b)) <= 1 && Math.abs(getCol(a) - getCol(b)) <= 1 && a !== b;
+}
+
+function newGame() {
+  const board = BOARDS[Math.floor(Math.random() * BOARDS.length)];
+  boardLetters = [...board];
+  selectedIndices = [];
+  usedIndices = [];
+  words = [];
+  score = 0;
+  bestWord = '';
+  render();
+  updateStats();
+  setFeedback('', false);
+  document.getElementById('word-tags').innerHTML = '';
+}
+
+function render() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  cells = [];
+  boardLetters.forEach((letter, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.textContent = letter;
+    cell.dataset.index = i;
+    cell.onclick = () => clickCell(i);
+    grid.appendChild(cell);
+    cells.push(cell);
+  });
+  refreshCells();
+  renderWordDisplay();
+}
+
+function refreshCells() {
+  cells.forEach((cell, i) => {
+    cell.className = 'cell';
+    if (usedIndices.includes(i)) cell.classList.add('used');
+    else if (selectedIndices.includes(i)) cell.classList.add('selected');
+  });
+}
+
+function clickCell(i) {
+  if (usedIndices.includes(i)) return;
+  const pos = selectedIndices.indexOf(i);
+  if (pos !== -1) {
+    if (pos === selectedIndices.length - 1) {
+      selectedIndices.pop();
+    } else {
+      setFeedback('Só pode remover a última letra!', true);
+    }
+    refreshCells();
+    renderWordDisplay();
+    return;
+  }
+  if (selectedIndices.length > 0) {
+    const last = selectedIndices[selectedIndices.length - 1];
+    if (!areAdjacent(last, i)) {
+      setFeedback('Letra não é adjacente!', true);
+      flashCells([i], 'flash-err');
+      return;
+    }
+  }
+  selectedIndices.push(i);
+  setFeedback('', false);
+  refreshCells();
+  renderWordDisplay();
+}
+
+function renderWordDisplay() {
+  const box = document.getElementById('word-display');
+  box.innerHTML = '';
+  if (selectedIndices.length === 0) {
+    box.classList.add('empty-hint');
+    return;
+  }
+  box.classList.remove('empty-hint');
+  selectedIndices.forEach((idx, pos) => {
+    const chip = document.createElement('span');
+    chip.className = 'letter-chip';
+    chip.textContent = boardLetters[idx];
+    chip.title = 'clique para remover (apenas a última)';
+    chip.onclick = (e) => {
+      e.stopPropagation();
+      if (pos === selectedIndices.length - 1) {
+        selectedIndices.pop();
+        refreshCells();
+        renderWordDisplay();
+      } else {
+        setFeedback('Só pode remover a última letra!', true);
+      }
+    };
+    box.appendChild(chip);
+  });
+}
+
+function clearSelection() {
+  selectedIndices = [];
+  refreshCells();
+  renderWordDisplay();
+  setFeedback('', false);
+}
+
+function confirmWord() {
+  if (selectedIndices.length < 3) {
+    setFeedback('Mínimo 3 letras!', true);
+    return;
+  }
+  const word = selectedIndices.map(i => boardLetters[i]).join('').toLowerCase();
+  const wordUpper = word.toUpperCase();
+  if (words.includes(wordUpper)) {
+    setFeedback('Palavra já encontrada!', true);
+    flashCells(selectedIndices, 'flash-err');
+    return;
+  }
+  if (!WORD_LIST.has(word) && !WORD_LIST.has(wordUpper.toLowerCase())) {
+    setFeedback(`"${wordUpper}" não é uma palavra válida.`, true);
+    flashCells(selectedIndices, 'flash-err');
+    return;
+  }
+  words.push(wordUpper);
+  score += word.length;
+  if (word.length > (bestWord?.length || 0)) bestWord = word;
+  flashCells(selectedIndices, 'flash-ok', () => {
+    selectedIndices.forEach(i => usedIndices.push(i));
+    selectedIndices = [];
+    refreshCells();
+    renderWordDisplay();
+    addWordTag(wordUpper);
+    updateStats();
+  });
+  setFeedback(`+${word.length} pontos!`, false);
+}
+
+function flashCells(indices, cls, cb) {
+  indices.forEach(i => {
+    cells[i].classList.add(cls);
+  });
+  setTimeout(() => {
+    indices.forEach(i => {
+      if (cells[i]) cells[i].classList.remove(cls);
+    });
+    if (cb) cb();
+  }, 400);
+}
+
+function addWordTag(word) {
+  const container = document.getElementById('word-tags');
+  const tag = document.createElement('span');
+  tag.className = 'word-tag';
+  tag.textContent = word;
+  container.appendChild(tag);
+}
+
+function updateStats() {
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('words-count').textContent = words.length;
+  document.getElementById('best-word').textContent = bestWord ? bestWord.toUpperCase() : '—';
+}
+
+function setFeedback(msg, isErr) {
+  const el = document.getElementById('feedback');
+  el.textContent = msg;
+  el.className = 'feedback' + (isErr ? '' : ' ok');
+  if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 2000);
+}
+
+newGame();
+</script>
