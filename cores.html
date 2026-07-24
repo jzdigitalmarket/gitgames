@@ -1,126 +1,9 @@
-HTML
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Padrão de 500 Colunas de Cores</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      overflow: hidden; /* Evita barras de rolagem */
-      background-color: #000;
-    }
-
-    /* Container principal usando Flexbox */
-    .color-grid {
-      display: flex;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    /* Cada uma das 500 colunas */
-    .column {
-      flex: 1; /* Distribui as 500 colunas de forma perfeitamente igual */
-      height: 100%;
-      /* Opcional: descomente a linha abaixo se quiser transição visual ao passar o mouse */
-      /* transition: transform 0.2s ease; */
-    }
-
-    .column:hover {
-      /* Destaca a coluna sob o cursor */
-      filter: brightness(1.3);
-    }
-  </style>
-</head>
-<body>
-
-  <div class="color-grid" id="grid"></div>
-
-  <script>
-    const container = document.getElementById('grid');
-    const TOTAL_COLUMNS = 500;
-
-    // Gera as 500 colunas
-    for (let i = 0; i < TOTAL_COLUMNS; i++) {
-      const col = document.createElement('div');
-      col.classList.add('column');
-
-      /* 
-        Matemática do Padrão:
-        Variamos a matriz (Hue) de 0 a 360 graus no espaço HSL.
-        (i / TOTAL_COLUMNS) * 360 cria um arco-íris perfeito.
-      */
-      const hue = (i / TOTAL_COLUMNS) * 360;
-      
-      // Define a cor de fundo no formato HSL (Matiz, Saturação %, Luminosidade %)
-      col.style.backgroundColor = `hsl(${hue}, 85%, 50%)`;
-      
-      // Opcional: adiciona uma legenda ao passar o mouse com a cor e o número da coluna
-      col.title = `Coluna ${i + 1} | HSL: ${Math.round(hue)}°`;
-
-      container.appendChild(col);
-    }
-  </script>
-</body>
-</html>
-Variações de Padrões de Cores
-Se quiser mudar o estilo do padrão visual, basta alterar a linha onde calculamos o backgroundColor dentro do JavaScript:
-
-1. Ondas de Repetição (Arco-íris Duplo/Triplo)
-Multiplique por um fator para fazer o ciclo de cores repetir várias vezes ao longo das 500 colunas:
-
-JavaScript
-// Repete o arco-íris 3 vezes ao longo da tela
-const hue = ((i / TOTAL_COLUMNS) * 360 * 3) % 360;
-col.style.backgroundColor = `hsl(${hue}, 80%, 50%)`;
-2. Gradiente Monocromático (Tom sobre Tom)
-Fixe o Hue (ex: 210 para azul) e varie a luminosidade de 10% a 90%:
-
-JavaScript
-// Padrão do escuro para o claro
-const lightness = 10 + (i / TOTAL_COLUMNS) * 80;
-col.style.backgroundColor = `hsl(210, 100%, ${lightness}%)`;
-3. Padrão Estilo "Pulsante" / Senoidal
-Usa funções trigonométricas para criar variações cíclicas sutis:
-
-JavaScript
-const hue = 200 + Math.sin(i * 0.05) * 50; // Oscila entre tons de azul e ciano
-const lightness = 40 + Math.cos(i * 0.02) * 20;
-col.style.backgroundColor = `hsl(${hue}, 90%, ${lightness}%)`;
-podes gerar uma arquvio unico?
-
-Seu arquivo HTML único está pronto.
-Ícone do app HTML
-500_colunas_cores
- HTML 
-Aberto
-
-O que foi incluído neste arquivo:
-HTML + CSS + JavaScript totalmente autônomos: Tudo em um único arquivo .html sem dependências externas.
-
-500 Colunas Fluidas: Ajustam-se automaticamente à largura da tela usando flexbox.
-
-Seletor de Padrões Visual: Menu suspenso no topo para alternar entre diferentes estilos (Arco-Íris, Arco-Íris Triplo, Onda Senoidal, Monocromático Azul e Pulso Neon).
-
-Painel Interativo: Exibe o número da coluna e a cor em formato HSL ao passar o cursor sobre as barras.
-
-
-
-
-O Gemini é uma IA e pode cometer erros.
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>500 Colunas de Cores - Padrões Interativos</title>
+  <title>5000 Colunas de Cores - Alta Performance (Canvas)</title>
   <style>
     * {
       box-sizing: border-box;
@@ -142,7 +25,7 @@ O Gemini é uma IA e pode cometer erros.
       top: 16px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(18, 18, 24, 0.85);
+      background: rgba(18, 18, 24, 0.88);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.12);
       padding: 10px 20px;
@@ -151,7 +34,7 @@ O Gemini é uma IA e pode cometer erros.
       gap: 12px;
       align-items: center;
       z-index: 100;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
 
     .controls label {
@@ -161,7 +44,7 @@ O Gemini é uma IA e pode cometer erros.
       margin-right: 4px;
     }
 
-    .controls select, .controls button {
+    .controls select {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.15);
       color: #fff;
@@ -173,29 +56,17 @@ O Gemini é uma IA e pode cometer erros.
       transition: all 0.2s ease;
     }
 
-    .controls select:hover, .controls button:hover {
+    .controls select:hover {
       background: rgba(255, 255, 255, 0.18);
       border-color: rgba(255, 255, 255, 0.3);
     }
 
-    /* Container principal usando Flexbox */
-    .color-grid {
-      display: flex;
+    /* Canvas full screen */
+    canvas {
+      display: block;
       width: 100vw;
       height: 100vh;
-    }
-
-    /* Cada uma das 500 colunas */
-    .column {
-      flex: 1;
-      height: 100%;
-      transition: filter 0.15s ease, transform 0.15s ease;
-    }
-
-    .column:hover {
-      filter: brightness(1.4) saturate(1.2);
-      z-index: 10;
-      transform: scaleY(1.02);
+      cursor: crosshair;
     }
 
     /* Tooltip / Status da coluna em destaque */
@@ -203,7 +74,7 @@ O Gemini é uma IA e pode cometer erros.
       position: absolute;
       bottom: 20px;
       left: 20px;
-      background: rgba(18, 18, 24, 0.85);
+      background: rgba(18, 18, 24, 0.88);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.12);
       padding: 8px 16px;
@@ -214,89 +85,131 @@ O Gemini é uma IA e pode cometer erros.
       pointer-events: none;
       z-index: 100;
     }
+
+    .info-panel span {
+      color: #4da6ff;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
 
   <div class="controls">
-    <label for="patternSelect">Padrão Visual:</label>
+    <label for="patternSelect">Padrão Visual (5.000 Colunas):</label>
     <select id="patternSelect">
-      <option value="rainbow">Arco-Íris Perfeito (0° - 360°)</option>
-      <option value="tripleRainbow">Arco-Íris Triplo (Onda 3x)</option>
-      <option value="sineWave">Onda Senoidal (Azul / Ciano)</option>
-      <option value="monochrome">Monocromático (Azul Profundo)</option>
-      <option value="neonPulse">Pulso Neon ( Magenta / Ciano / Amarelo )</option>
+      <option value="rainbow">Arco-Íris Contínuo (0° - 360°)</option>
+      <option value="multiOnda">Ondas Espectrais (Frequência Alta)</option>
+      <option value="sinePlasma">Plasma Senoidal Interativo</option>
+      <option value="cyberpunk">Cyberpunk Neon (Rosa / Ciano / Roxo)</option>
+      <option value="goldGradient">Monocromático Ouro & Carbono</option>
     </select>
   </div>
 
-  <div class="info-panel" id="infoPanel">Passe o mouse sobre as colunas</div>
+  <div class="info-panel" id="infoPanel">Mova o cursor sobre o padrão | <span>Total: 5.000 colunas</span></div>
 
-  <div class="color-grid" id="grid"></div>
+  <canvas id="colorCanvas"></canvas>
 
   <script>
-    const container = document.getElementById('grid');
+    const canvas = document.getElementById('colorCanvas');
+    const ctx = canvas.getContext('2d');
     const select = document.getElementById('patternSelect');
     const infoPanel = document.getElementById('infoPanel');
-    const TOTAL_COLUMNS = 500;
+    
+    const TOTAL_COLUMNS = 5000;
+    let hoveredIndex = -1;
 
-    function generateColumns(pattern) {
-      container.innerHTML = ''; // Limpa colunas anteriores
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawPattern();
+    }
 
-      for (let i = 0; i < TOTAL_COLUMNS; i++) {
-        const col = document.createElement('div');
-        col.classList.add('column');
+    function getColor(index, pattern) {
+      let hue, saturation, lightness;
 
-        let color = '';
-
-        switch(pattern) {
-          case 'rainbow': {
-            const hue = (i / TOTAL_COLUMNS) * 360;
-            color = `hsl(${hue}, 85%, 50%)`;
-            break;
-          }
-          case 'tripleRainbow': {
-            const hue = ((i / TOTAL_COLUMNS) * 360 * 3) % 360;
-            color = `hsl(${hue}, 85%, 50%)`;
-            break;
-          }
-          case 'sineWave': {
-            const hue = 190 + Math.sin(i * 0.04) * 50;
-            const lightness = 40 + Math.cos(i * 0.02) * 20;
-            color = `hsl(${hue}, 90%, ${lightness}%)`;
-            break;
-          }
-          case 'monochrome': {
-            const lightness = 8 + (i / TOTAL_COLUMNS) * 82;
-            color = `hsl(215, 80%, ${lightness}%)`;
-            break;
-          }
-          case 'neonPulse': {
-            const hue = (Math.sin(i * 0.03) * 180 + 180) % 360;
-            const saturation = 80 + Math.sin(i * 0.1) * 20;
-            color = `hsl(${hue}, ${saturation}%, 50%)`;
-            break;
-          }
+      switch(pattern) {
+        case 'rainbow': {
+          hue = (index / TOTAL_COLUMNS) * 360;
+          return `hsl(${hue}, 85%, 50%)`;
         }
-
-        col.style.backgroundColor = color;
-
-        col.addEventListener('mouseenter', () => {
-          infoPanel.innerText = `Coluna: ${i + 1} / 500 | Cor: ${color}`;
-        });
-
-        container.appendChild(col);
+        case 'multiOnda': {
+          hue = ((index / TOTAL_COLUMNS) * 360 * 12) % 360;
+          lightness = 45 + Math.sin(index * 0.01) * 15;
+          return `hsl(${hue}, 90%, ${lightness}%)`;
+        }
+        case 'sinePlasma': {
+          hue = (180 + Math.sin(index * 0.005) * 120 + Math.cos(index * 0.015) * 60) % 360;
+          lightness = 40 + Math.sin(index * 0.02) * 20;
+          return `hsl(${hue}, 95%, ${lightness}%)`;
+        }
+        case 'cyberpunk': {
+          const t = index / TOTAL_COLUMNS;
+          hue = 180 + Math.sin(t * Math.PI * 6) * 140;
+          saturation = 85 + Math.cos(t * Math.PI * 4) * 15;
+          return `hsl(${hue}, ${saturation}%, 55%)`;
+        }
+        case 'goldGradient': {
+          lightness = 5 + (index / TOTAL_COLUMNS) * 75;
+          hue = 40 + Math.sin(index * 0.008) * 10;
+          return `hsl(${hue}, 85%, ${lightness}%)`;
+        }
+        default:
+          return '#ffffff';
       }
     }
 
-    // Inicializa com o padrão padrão
-    generateColumns('rainbow');
+    function drawPattern() {
+      const width = canvas.width;
+      const height = canvas.height;
+      const colWidth = width / TOTAL_COLUMNS;
+      const pattern = select.value;
 
-    // Troca o padrão dinamicamente
-    select.addEventListener('change', (e) => {
-      generateColumns(e.target.value);
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < TOTAL_COLUMNS; i++) {
+        const x = i * colWidth;
+        const color = getColor(i, pattern);
+
+        ctx.fillStyle = color;
+        // Desenha a coluna (usa x estendido ligeiramente para evitar lacunas de subpixel)
+        ctx.fillRect(x, 0, colWidth + 0.5, height);
+
+        // Highlight na coluna sob o mouse
+        if (i === hoveredIndex) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.fillRect(x - colWidth * 2, 0, colWidth * 5, height);
+        }
+      }
+    }
+
+    // Gerenciamento de eventos
+    window.addEventListener('resize', resizeCanvas);
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const colWidth = canvas.width / TOTAL_COLUMNS;
+      
+      const newIndex = Math.floor(mouseX / colWidth);
+
+      if (newIndex >= 0 && newIndex < TOTAL_COLUMNS && newIndex !== hoveredIndex) {
+        hoveredIndex = newIndex;
+        const color = getColor(hoveredIndex, select.value);
+        infoPanel.innerHTML = `Coluna: <span>${hoveredIndex + 1}</span> / 5.000 | Cor: <span>${color}</span>`;
+        drawPattern();
+      }
     });
+
+    canvas.addEventListener('mouseleave', () => {
+      hoveredIndex = -1;
+      infoPanel.innerHTML = `Mova o cursor sobre o padrão | <span>Total: 5.000 colunas</span>`;
+      drawPattern();
+    });
+
+    select.addEventListener('change', drawPattern);
+
+    // Renderização inicial
+    resizeCanvas();
   </script>
 </body>
 </html>
-500_colunas_cores.html
-Exibindo 500_colunas_cores.html.
