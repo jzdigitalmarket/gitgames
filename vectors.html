@@ -1,0 +1,32 @@
+// src/lib.rs (Código em Rust para ser compilado em WASM)
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub struct PhysicsEngine {
+    positions_x: Vec<f32>,
+    positions_y: Vec<f32>,
+    velocities_x: Vec<f32>,
+    velocities_y: Vec<f32>,
+}
+
+#[wasm_bindgen]
+impl PhysicsEngine {
+    // Inicializa 500.000 partículas para cálculo em paralelo
+    #[wasm_bindgen(constructor)]
+    pub fn new(count: usize) -> Self {
+        Self {
+            positions_x: vec![0.0; count],
+            positions_y: vec![0.0; count],
+            velocities_x: vec![1.0; count],
+            velocities_y: vec![2.0; count],
+        }
+    }
+
+    // Método executado a cada frame no ciclo do navegador sem custo de Garbage Collector
+    pub fn update(&mut self, dt: f32) {
+        for i in 0..self.positions_x.len() {
+            self.positions_x[i] += self.velocities_x[i] * dt;
+            self.positions_y[i] += self.velocities_y[i] * dt;
+        }
+    }
+}
