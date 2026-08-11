@@ -712,6 +712,28 @@ canvas.addEventListener('touchend', () => { dpadState.up = dpadState.down = dpad
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 generateMaze();
 loop();
+
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+// Criando uma linha do tempo vinculada ao Scroll
+const tl = gsap.timeline({
+  scrollTrigger: {
+    trigger: ".hero-section",
+    start: "top top",     // Começa quando o topo do container atinge o topo da tela
+    end: "bottom top",    // Termina quando o fundo do container sai pelo topo
+    scrub: 1,             // Suaviza o movimento (1 segundo de "delay" na resposta)
+    pin: true             // Fixa a seção na tela durante a animação
+  }
+});
+
+tl.to(".bg-layer", { y: "30%", scale: 1.2 }, 0)   // Fundo move devagar
+  .to(".mid-layer", { y: "-20%" }, 0)              // Camada média sobe um pouco
+  .to(".fore-layer", { y: "-50%", opacity: 0 }, 0); // Frente sobe rápido e desaparece
+
+    
 </script>
 </body>
 </html>
