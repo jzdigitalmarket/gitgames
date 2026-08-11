@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Gaussian Splatting Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: system-ui, sans-serif; }
+    #container { width: 100vw; height: 100vh; }
+    #loading {
+      position: absolute; top: 20px; left: 20px; color: #fff;
+      background: rgba(0,0,0,0.7); padding: 10px 16px; border-radius: 6px;
+      pointer-events: none; font-size: 14px;
+    }
+  </style>
+  
+  <!-- Import Map para dependências modernas sem necessidade de bundler -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "@m33/gaussian-splatting-3d": "https://cdn.jsdelivr.net/npm/@m33/gaussian-splatting-3d@1.0.2/dist/gaussian-splatting-3d.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <div id="loading">Carregando cena Gaussian Splatting...</div>
+  <div id="container"></div>
+
+  <script type="module">
+    import * as GaussianSplat3D from '@m33/gaussian-splatting-3d';
+
+    async function initSplatViewer() {
+      const loadingEl = document.getElementById('loading');
+
+      try {
+        const viewer = new GaussianSplat3D.Viewer({
+          'cameraUp': [0, -1, -0.5],
+          'initialCameraPosition': [-1, -2, 4],
+          'initialCameraLookAt': [0, 0, 0],
+          'sphericalHarmonicsDegree': 0
+        });
+
+        // Carrega um modelo .splat público hospedado no HuggingFace
+        await viewer.addSplatScene(
+          'https://huggingface.co/datasets/cakir/splat-data/resolve/main/bonsai.splat',
+          {
+            'splatAlphaRemovalThreshold': 5,
+            'showLoadingUI': false
+          }
+        );
+
+        viewer.start();
+        loadingEl.style.display = 'none';
+      } catch (err) {
+        loadingEl.textContent = 'Erro ao carregar o modelo 3D Splat.';
+        console.error(err);
+      }
+    }
+
+    initSplatViewer();
+  </script>
+</body>
+</html>
