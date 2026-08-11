@@ -1,0 +1,12 @@
+import gsap from 'gsap';
+
+// Animação ao clicar
+const box = document.querySelector('.box');
+
+box.addEventListener('click', () => {
+  gsap.to('.box', {
+    x: 100,
+    duration: 1,
+    ease: 'bounce.out'
+  });
+});
