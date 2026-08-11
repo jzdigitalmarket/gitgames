@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Demonstração 3D Gaussian Splatting</title>
+  <style>
+    body { margin: 0; background: #111; overflow: hidden; }
+    #canvas { width: 100vw; height: 100vh; display: block; }
+  </style>
+
+  <!-- Import do visualizador de Gaussian Splatting baseado em WebGL/WebGPU -->
+  <script type="module">
+    import * as GaussianSplat3D from 'https://cdn.jsdelivr.net/npm/@m33/gaussian-splatting-3d@1.0.2/dist/gaussian-splatting-3d.module.js';
+
+    async function loadSplatScene() {
+      const container = document.body;
+
+      // Inicializa o viewer com ordenação de instâncias em tempo real
+      const viewer = new GaussianSplat3D.Viewer({
+        'cameraUp': [0, -1, -0.6],
+        'initialCameraPosition': [-1, -4, 6],
+        'initialCameraLookAt': [0, 0, 0],
+        'sphericalHarmonicsDegree': 2
+      });
+
+      // Carrega um arquivo de captura contendo milhões de partículas fotorrealistas
+      await viewer.addSplatScene('https://huggingface.co/datasets/cakir/splat-data/resolve/main/bonsai.splat', {
+        'splatAlphaRemovalThreshold': 5,
+        'showLoadingUI': true,
+      });
+
+      viewer.start();
+    }
+
+    // loadSplatScene();
+  </script>
+</head>
+<body>
+  <!-- O canvas renderizará o volume 3D realista sem polígonos tradicionais -->
+</body>
+</html>
