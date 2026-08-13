@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Conceito de Limite - Estilo Manim em JS</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #0f172a; /* Fundo escuro estilo Manim */
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    svg {
+      background: #1e293b;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .axis { stroke: #64748b; stroke-width: 2; }
+    .grid { stroke: #334155; stroke-width: 1; stroke-dasharray: 4; }
+    .graph-line { stroke: #38bdf8; stroke-width: 4; fill: none; }
+    .limit-point { fill: #f43f5e; }
+    .approach-point { fill: #f59e0b; }
+    .guide-line { stroke: #f59e0b; stroke-width: 1.5; stroke-dasharray: 3; }
+    .label { fill: #cbd5e1; font-size: 14px; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+  <h2>Visualização de Limite: $\lim_{x \to 3} f(x) = 4$</h2>
+
+  <svg id="canvas" width="600" height="400" viewBox="0 0 600 400">
+    <!-- Eixos -->
+    <line x1="50" y1="350" x2="550" y2="350" class="axis" /> <!-- Eixo X -->
+    <line x1="100" y1="50" x2="100" y2="380" class="axis" />  <!-- Eixo Y -->
+
+    <!-- Rótulos dos Eixos -->
+    <text x="540" y="380" class="label">x</text>
+    <text x="70" y="60" class="label">y</text>
+
+    <!-- Curva da Função f(x) = (x-1)^2 + 1 -->
+    <path id="functionCurve" class="graph-line" />
+
+    <!-- Ponto Alvo do Limite (L) -->
+    <circle id="targetPoint" r="6" class="limit-point" />
+
+    <!-- Guias e Pontos de Aproximação (Esquerda e Direita) -->
+    <line id="guideLeftY" class="guide-line" />
+    <line id="guideLeftX" class="guide-line" />
+    <circle id="pointLeft" r="5" class="approach-point" />
+
+    <line id="guideRightY" class="guide-line" />
+    <line id="guideRightX" class="guide-line" />
+    <circle id="pointRight" r="5" class="approach-point" />
+  </svg>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script>
+    // 1. Mapeamento Matemático para Coordenadas SVG de Tela
+    // Origem do gráfico (0,0) está no ponto SVG (100, 350)
+    const originX = 100;
+    const originY = 350;
+    const scaleX = 80; // 1 unidade de x = 80px
+    const scaleY = 50; // 1 unidade de y = 50px
+
+    function toScreenX(x) { return originX + x * scaleX; }
+    function toScreenY(y) { return originY - y * scaleY; }
+
+    // Função matemática: f(x) = 0.5 * (x - 1)^2 + 2
+    function f(x) { return 0.5 * Math.pow(x - 1, 2) + 2; }
+
+    // Ponto onde queremos calcular o limite (c = 3)
+    const targetX = 3;
+    const targetY = f(targetX); // f(3) = 4
+
+    // 2. Desenhar a Curva em SVG
+    const curvePath = document.getElementById('functionCurve');
+    let pathData = "";
+    for (let x = 0; x <= 5.2; x += 0.1) {
+      const sx = toScreenX(x);
+      const sy = toScreenY(f(x));
+      pathData += (x === 0 ? `M ${sx} ${sy}` : ` L ${sx} ${sy}`);
+    }
+    curvePath.setAttribute('d', pathData);
+
+    // Posiciona o ponto do Limite Alvo
+    document.getElementById('targetPoint').setAttribute('cx', toScreenX(targetX));
+    document.getElementById('targetPoint').setAttribute('cy', toScreenY(targetY));
+
+    // 3. Estado de Animação dos Parâmetros (Delta de aproximação)
+    const animState = { delta: 2.0 };
+
+    function updateApproximation() {
+      const d = animState.delta;
+
+      // Aproximação Pela Esquerda (x -> c-)
+      const xL = targetX - d;
+      const yL = f(xL);
+      const sxL = toScreenX(xL);
+      const syL = toScreenY(yL);
+
+      document.getElementById('pointLeft').setAttribute('cx', sxL);
+      document.getElementById('pointLeft').setAttribute('cy', syL);
+      document.getElementById('guideLeftX').setAttribute('x1', sxL);
+      document.getElementById('guideLeftX').setAttribute('y1', syL);
+      document.getElementById('guideLeftX').setAttribute('x2', sxL);
+      document.getElementById('guideLeftX').setAttribute('y2', originY);
+
+      document.getElementById('guideLeftY').setAttribute('x1', sxL);
+      document.getElementById('guideLeftY').setAttribute('y1', syL);
+      document.getElementById('guideLeftY').setAttribute('x2', originX);
+      document.getElementById('guideLeftY').setAttribute('y2', syL);
+
+      // Aproximação Pela Direita (x -> c+)
+      const xR = targetX + d;
+      const yR = f(xR);
+      const sxR = toScreenX(xR);
+      const syR = toScreenY(yR);
+
+      document.getElementById('pointRight').setAttribute('cx', sxR);
+      document.getElementById('pointRight').setAttribute('cy', syR);
+      document.getElementById('guideRightX').setAttribute('x1', sxR);
+      document.getElementById('guideRightX').setAttribute('y1', syR);
+      document.getElementById('guideRightX').setAttribute('x2', sxR);
+      document.getElementById('guideRightX').setAttribute('y2', originY);
+
+      document.getElementById('guideRightY').setAttribute('x1', sxR);
+      document.getElementById('guideRightY').setAttribute('y1', syR);
+      document.getElementById('guideRightY').setAttribute('x2', originX);
+      document.getElementById('guideRightY').setAttribute('y2', syR);
+    }
+
+    // Executa a primeira renderização
+    updateApproximation();
+
+    // 4. Animação Suave com GSAP
+    const tl = gsap.timeline({ repeat: -1, yoyo: true });
+
+    // Anima o delta de 2.0 (distante) até 0.05 (muito próximo de c)
+    tl.to(animState, {
+      delta: 0.05,
+      duration: 4,
+      ease: "power2.inOut",
+      onUpdate: updateApproximation
+    });
+  </script>
+</body>
+</html>
