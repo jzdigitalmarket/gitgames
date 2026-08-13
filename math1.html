@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Campo Vetorial 3D: InstancedMesh + GSAP</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #090d16; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+<script>
+// 1. Configuração do Cenário e Câmera
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(12, 10, 15);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+// Luzes para dar profundidade 3D aos vetores
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
+scene.add(dirLight);
+
+// 2. Construção da Geometria da Seta Base
+// Criamos uma única geometria composta (Haste + Ponta Cone)
+const arrowGroup = new THREE.Group();
+
+const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 8);
+stemGeo.translate(0, 0.4, 0); // Origem na base
+
+const coneGeo = new THREE.ConeGeometry(0.08, 0.2, 8);
+coneGeo.translate(0, 0.9, 0); // Posiciona o cone no topo do cilindro
+
+// Combinar geometrias em um único buffer para o InstancedMesh
+const singleArrowGeo = THREE.BufferGeometryUtils ? 
+  THREE.BufferGeometryUtils.mergeBufferGeometries([stemGeo, coneGeo]) : 
+  coneGeo; // Fallback simples caso utilitário não esteja carregado
+
+// Criando a geometria base unificada manualmente para evitar dependências externas
+function createArrowGeometry() {
+  const geometry = new THREE.ConeGeometry(0.06, 0.5, 8);
+  geometry.rotateX(Math.PI / 2); // Orienta a seta apontando para o eixo +Z
+  return geometry;
+}
+
+const baseGeometry = createArrowGeometry();
+const material = new THREE.MeshPhongMaterial({ color: 0x38bdf8, flatShading: true });
+
+// 3. Grade do Campo Vetorial
+const gridSize = 7; // 7x7x7 = 343 vetores
+const spacing = 2;
+const count = Math.pow(gridSize, 3);
+
+const instancedMesh = new THREE.InstancedMesh(baseGeometry, material, count);
+scene.add(instancedMesh);
+
+// Buffers para guardar as posições base no espaço
+const gridPositions = [];
+const halfGrid = (gridSize - 1) / 2;
+
+for (let x = 0; x < gridSize; x++) {
+  for (let y = 0; y < gridSize; y++) {
+    for (let z = 0; z < gridSize; z++) {
+      gridPositions.push(new THREE.Vector3(
+        (x - halfGrid) * spacing,
+        (y - halfGrid) * spacing,
+        (z - halfGrid) * spacing
+      ));
+    }
+  }
+}
+
+// Objects auxiliares reutilizáveis para evitar Garbage Collection em tempo de execução
+const dummy = new THREE.Object3D();
+const vectorVal = new THREE.Vector3();
+const targetPos = new THREE.Vector3();
+
+// 4. Função de Atualização Matemática do Campo
+const animState = { time: 0 };
+
+function updateVectorField() {
+  const t = animState.time;
+
+  for (let i = 0; i < count; i++) {
+    const pos = gridPositions[i];
+
+    // Equação do Campo Vetorial V(x, y, z, t)
+    const vx = Math.sin(pos.y * 0.5 + t);
+    const vy = Math.cos(pos.z * 0.5 + t);
+    const vz = Math.sin(pos.x * 0.5 + t);
+
+    vectorVal.set(vx, vy, vz);
+    const magnitude = vectorVal.length();
+
+    // Configurar posição e rotação da instância
+    dummy.position.copy(pos);
+    
+    // Faz a seta apontar na direção do vetor (pos + direção)
+    targetPos.copy(pos).add(vectorVal);
+    dummy.lookAt(targetPos);
+
+    // Escala a seta proporcionalmente à magnitude do vetor local
+    dummy.scale.set(1, 1, Math.max(0.2, magnitude * 1.2));
+
+    dummy.updateMatrix();
+    instancedMesh.setMatrixAt(i, dummy.matrix);
+  }
+
+  // Notifica o WebGL que a matriz das instâncias mudou
+  instancedMesh.instanceMatrix.needsUpdate = true;
+}
+
+// 5. Timeline de Animação GSAP
+gsap.to(animState, {
+  time: Math.PI * 4,
+  duration: 8,
+  repeat: -1,
+  ease: "none",
+  onUpdate: updateVectorField
+});
+
+// Animação de rotação contínua da cena para melhor visualização 3D
+gsap.to(scene.rotation, {
+  y: Math.PI * 2,
+  duration: 20,
+  repeat: -1,
+  ease: "none"
+});
+
+// Loop de Renderização
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+// Responsividade
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
