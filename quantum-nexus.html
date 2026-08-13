@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QUANTUM NEXUS // Interface de Núcleo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
+
+  :root{
+    --cyan: #00f6ff;
+    --violet: #8b2fff;
+    --magenta: #ff2fd6;
+    --ink: #050510;
+    --paper: #d9f6ff;
+    --dim: rgba(0,246,255,0.35);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{
+    width:100%; height:100%;
+    background: radial-gradient(ellipse at center, #0a0a1a 0%, #030308 70%, #000 100%);
+    overflow:hidden;
+    font-family:'Share Tech Mono', monospace;
+    color: var(--paper);
+  }
+
+  #scene{ position:fixed; inset:0; z-index:1; }
+
+  .hud{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+
+  /* corner brackets */
+  .bracket{ position:absolute; width:46px; height:46px; opacity:0; }
+  .bracket.tl{ top:24px; left:24px; border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+  .bracket.tr{ top:24px; right:24px; border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+  .bracket.bl{ bottom:24px; left:24px; border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+  .bracket.br{ bottom:24px; right:24px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+  .title-block{
+    position:absolute; top:38px; left:50%; transform:translateX(-50%);
+    text-align:center; opacity:0;
+  }
+  .title-block h1{
+    font-family:'Orbitron', sans-serif; font-weight:900;
+    font-size: clamp(22px, 4vw, 44px);
+    letter-spacing: 10px;
+    color: var(--paper);
+    text-shadow: 0 0 6px var(--cyan), 0 0 22px rgba(0,246,255,0.6), 0 0 46px rgba(139,47,255,0.35);
+    position:relative;
+  }
+  .title-block h1::before, .title-block h1::after{
+    content: attr(data-text);
+    position:absolute; left:0; top:0; width:100%;
+    clip-path: inset(0 0 0 0);
+    opacity:0.85;
+  }
+  .title-block h1::before{ color: var(--magenta); animation: glitchA 4.2s infinite linear; }
+  .title-block h1::after{ color: var(--cyan); animation: glitchB 4.2s infinite linear; }
+  @keyframes glitchA{
+    0%,92%,100%{ clip-path: inset(0 0 0 0); transform:translate(0,0); }
+    93%{ clip-path: inset(10% 0 60% 0); transform:translate(-3px,-1px); }
+    95%{ clip-path: inset(60% 0 5% 0); transform:translate(3px,1px); }
+    97%{ clip-path: inset(30% 0 40% 0); transform:translate(-2px,0); }
+  }
+  @keyframes glitchB{
+    0%,90%,100%{ clip-path: inset(0 0 0 0); transform:translate(0,0); }
+    91%{ clip-path: inset(70% 0 5% 0); transform:translate(3px,1px); }
+    94%{ clip-path: inset(15% 0 55% 0); transform:translate(-3px,-1px); }
+    96%{ clip-path: inset(45% 0 20% 0); transform:translate(2px,0); }
+  }
+  .subtitle{
+    margin-top:10px; font-size:11px; letter-spacing:4px; color: var(--cyan);
+    opacity:0.85;
+  }
+  .subtitle .dot{
+    display:inline-block; width:6px; height:6px; border-radius:50%;
+    background: #37ff9a; margin-right:8px; box-shadow:0 0 8px #37ff9a;
+    animation: blink 1.6s infinite ease-in-out;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+
+  .panel{
+    position:absolute; width:220px; padding:16px 18px;
+    border:1px solid var(--dim);
+    background: linear-gradient(180deg, rgba(0,20,30,0.35), rgba(0,10,20,0.15));
+    backdrop-filter: blur(2px);
+    opacity:0;
+    font-size:11px; letter-spacing:1px;
+  }
+  .panel.left{ top:110px; left:34px; }
+  .panel.right{ top:110px; right:34px; }
+  .panel h3{
+    font-family:'Orbitron', sans-serif; font-size:11px; letter-spacing:3px;
+    color: var(--violet); margin-bottom:12px; padding-bottom:8px;
+    border-bottom:1px solid var(--dim);
+  }
+  .row{ display:flex; justify-content:space-between; margin-bottom:9px; color: rgba(217,246,255,0.75); }
+  .row span:last-child{ color: var(--cyan); }
+  .bar{ height:3px; background:rgba(0,246,255,0.12); margin-top:4px; overflow:hidden; }
+  .bar i{ display:block; height:100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); width:0%; }
+
+  .hint{
+    position:absolute; bottom:34px; left:50%; transform:translateX(-50%);
+    font-size:10px; letter-spacing:3px; color: rgba(217,246,255,0.5);
+    opacity:0;
+  }
+
+  .scanline{
+    position:fixed; inset:0; z-index:3; pointer-events:none;
+    background: repeating-linear-gradient(
+      to bottom, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px,
+      transparent 2px, transparent 3px
+    );
+    mix-blend-mode: overlay;
+  }
+  .vignette{
+    position:fixed; inset:0; z-index:3; pointer-events:none;
+    box-shadow: inset 0 0 200px rgba(0,0,0,0.85);
+  }
+
+  .flash{
+    position:fixed; inset:0; z-index:4; pointer-events:none;
+    background: radial-gradient(circle, rgba(0,246,255,0.25), transparent 60%);
+    opacity:0;
+  }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+
+<div class="hud">
+  <div class="bracket tl"></div>
+  <div class="bracket tr"></div>
+  <div class="bracket bl"></div>
+  <div class="bracket br"></div>
+
+  <div class="title-block">
+    <h1 data-text="QUANTUM NEXUS">QUANTUM NEXUS</h1>
+    <p class="subtitle"><span class="dot"></span>NÚCLEO NEURAL // STATUS: ONLINE</p>
+  </div>
+
+  <div class="panel left">
+    <h3>DIAGNÓSTICO</h3>
+    <div class="row"><span>ENERGIA</span><span id="val-energia">00.0%</span></div>
+    <div class="bar"><i id="bar-energia"></i></div>
+    <div class="row" style="margin-top:12px;"><span>SINCRONIA</span><span id="val-sincronia">00.0%</span></div>
+    <div class="bar"><i id="bar-sincronia"></i></div>
+    <div class="row" style="margin-top:12px;"><span>FREQUÊNCIA</span><span id="val-freq">0.00 THz</span></div>
+  </div>
+
+  <div class="panel right">
+    <h3>NÓDULOS ATIVOS</h3>
+    <div class="row"><span>NÓS CONECTADOS</span><span id="val-nos">0000</span></div>
+    <div class="row"><span>FLUXO DE DADOS</span><span id="val-fluxo">0.0 GB/s</span></div>
+    <div class="row"><span>LATÊNCIA</span><span id="val-latencia">0 ms</span></div>
+    <div class="row" style="margin-top:12px; color:rgba(217,246,255,0.4); font-size:10px;">
+      CLIQUE NO NÚCLEO PARA<br>DISPARAR PULSO QUÂNTICO
+    </div>
+  </div>
+
+  <p class="hint">MOVA O CURSOR PARA ORBITAR // CLIQUE PARA INTERAGIR</p>
+</div>
+
+<div class="scanline"></div>
+<div class="vignette"></div>
+<div class="flash" id="flash"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+
+  // ---------- Setup base ----------
+  const container = document.getElementById('scene');
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x030308, 0.028);
+
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+  camera.position.set(0, 0, 42);
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  // ---------- Glow sprite texture (canvas-generated) ----------
+  function makeGlowTexture(colorInner, colorOuter){
+    const size = 256;
+    const cnv = document.createElement('canvas');
+    cnv.width = cnv.height = size;
+    const ctx = cnv.getContext('2d');
+    const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    grad.addColorStop(0, colorInner);
+    grad.addColorStop(0.4, colorOuter);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,size,size);
+    return new THREE.CanvasTexture(cnv);
+  }
+  const glowTexCyan = makeGlowTexture('rgba(180,255,255,1)', 'rgba(0,246,255,0.5)');
+  const glowTexViolet = makeGlowTexture('rgba(230,200,255,1)', 'rgba(139,47,255,0.5)');
+
+  // ---------- Core group ----------
+  const core = new THREE.Group();
+  scene.add(core);
+
+  // central glow
+  const centralGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexViolet, transparent:true, blending: THREE.AdditiveBlending, depthWrite:false
+  }));
+  centralGlow.scale.set(9,9,1);
+  core.add(centralGlow);
+
+  // inner sphere (energy core)
+  const innerCore = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.4, 2),
+    new THREE.MeshBasicMaterial({ color:0x9d5bff, transparent:true, opacity:0.85, wireframe:false })
+  );
+  core.add(innerCore);
+
+  // wireframe shell
+  const shellGeo = new THREE.IcosahedronGeometry(2.6, 1);
+  const shellEdges = new THREE.EdgesGeometry(shellGeo);
+  const shell = new THREE.LineSegments(
+    shellEdges,
+    new THREE.LineBasicMaterial({ color:0x00f6ff, transparent:true, opacity:0.65 })
+  );
+  core.add(shell);
+
+  // orbit rings
+  const rings = [];
+  const ringColors = [0x00f6ff, 0xff2fd6, 0x8b2fff];
+  for(let i=0;i<3;i++){
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(4.4 + i*1.1, 0.02, 8, 128),
+      new THREE.MeshBasicMaterial({ color: ringColors[i], transparent:true, opacity:0.5 })
+    );
+    ring.rotation.x = Math.random()*Math.PI;
+    ring.rotation.y = Math.random()*Math.PI;
+    ring.userData.speed = 0.15 + i*0.08;
+    ring.userData.axis = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
+    rings.push(ring);
+    core.add(ring);
+  }
+
+  // invisible click target (bigger, easier to hit)
+  const clickTarget = new THREE.Mesh(
+    new THREE.SphereGeometry(3.2, 16, 16),
+    new THREE.MeshBasicMaterial({ visible:false })
+  );
+  core.add(clickTarget);
+
+  // ---------- Particle field (neural constellation) ----------
+  const PARTICLE_COUNT = 900;
+  const positions = new Float32Array(PARTICLE_COUNT*3);
+  const colors = new Float32Array(PARTICLE_COUNT*3);
+  const colorCyan = new THREE.Color(0x00f6ff);
+  const colorMagenta = new THREE.Color(0xff2fd6);
+
+  for(let i=0;i<PARTICLE_COUNT;i++){
+    const r = 6 + Math.random()*10;
+    const theta = Math.random()*Math.PI*2;
+    const phi = Math.acos((Math.random()*2)-1);
+    const x = r*Math.sin(phi)*Math.cos(theta);
+    const y = r*Math.sin(phi)*Math.sin(theta);
+    const z = r*Math.cos(phi);
+    positions[i*3]=x; positions[i*3+1]=y; positions[i*3+2]=z;
+
+    const c = colorCyan.clone().lerp(colorMagenta, Math.random());
+    colors[i*3]=c.r; colors[i*3+1]=c.g; colors[i*3+2]=c.b;
+  }
+  const particleGeo = new THREE.BufferGeometry();
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  particleGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+
+  const particleMat = new THREE.PointsMaterial({
+    size:0.22, map: glowTexCyan, transparent:true, blending:THREE.AdditiveBlending,
+    depthWrite:false, vertexColors:true
+  });
+  const particles = new THREE.Points(particleGeo, particleMat);
+  core.add(particles);
+
+  // sparse neural links between nearby particles
+  const linkPositions = [];
+  const maxLinks = 140;
+  let linkCount = 0;
+  for(let i=0;i<PARTICLE_COUNT && linkCount<maxLinks;i+=7){
+    const ax=positions[i*3], ay=positions[i*3+1], az=positions[i*3+2];
+    for(let j=i+1;j<Math.min(i+40,PARTICLE_COUNT) && linkCount<maxLinks;j+=5){
+      const bx=positions[j*3], by=positions[j*3+1], bz=positions[j*3+2];
+      const d = Math.hypot(ax-bx, ay-by, az-bz);
+      if(d < 3.2){
+        linkPositions.push(ax,ay,az, bx,by,bz);
+        linkCount++;
+      }
+    }
+  }
+  const linkGeo = new THREE.BufferGeometry();
+  linkGeo.setAttribute('position', new THREE.Float32BufferAttribute(linkPositions,3));
+  const links = new THREE.LineSegments(
+    linkGeo,
+    new THREE.LineBasicMaterial({ color:0x00f6ff, transparent:true, opacity:0.12 })
+  );
+  core.add(links);
+
+  // distant starfield
+  const starGeo = new THREE.BufferGeometry();
+  const starCount = 1400;
+  const starPos = new Float32Array(starCount*3);
+  for(let i=0;i<starCount;i++){
+    starPos[i*3] = (Math.random()-0.5)*220;
+    starPos[i*3+1] = (Math.random()-0.5)*220;
+    starPos[i*3+2] = (Math.random()-0.5)*220;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3));
+  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color:0xffffff, size:0.09, transparent:true, opacity:0.55
+  }));
+  scene.add(stars);
+
+  // ---------- Interaction: pointer parallax + click pulse ----------
+  const mouse = new THREE.Vector2(0,0);
+  const targetRot = { x:0, y:0 };
+  window.addEventListener('mousemove', (e)=>{
+    mouse.x = (e.clientX/window.innerWidth)*2 - 1;
+    mouse.y = (e.clientY/window.innerHeight)*2 - 1;
+    targetRot.y = mouse.x * 0.5;
+    targetRot.x = mouse.y * 0.3;
+  });
+
+  const raycaster = new THREE.Raycaster();
+  const pointerVec = new THREE.Vector2();
+  let pulseTimeline = null;
+
+  function triggerPulse(){
+    if(pulseTimeline) pulseTimeline.kill();
+    pulseTimeline = gsap.timeline();
+    pulseTimeline.to(centralGlow.scale, { x:16, y:16, duration:0.35, ease:'power2.out' })
+      .to(centralGlow.scale, { x:9, y:9, duration:0.9, ease:'elastic.out(1,0.4)' }, 0.35)
+      .to(innerCore.material, { opacity:1, duration:0.2, yoyo:true, repeat:1 }, 0)
+      .to(camera.position, { z:'-=2.2', duration:0.25, ease:'power2.out', yoyo:true, repeat:1 }, 0);
+
+    gsap.fromTo('#flash', { opacity:0.55 }, { opacity:0, duration:0.6, ease:'power2.out' });
+
+    rings.forEach((r,i)=>{
+      gsap.to(r.scale, { x:1.3, y:1.3, z:1.3, duration:0.4, delay:i*0.05, ease:'power2.out', yoyo:true, repeat:1 });
+    });
+  }
+
+  window.addEventListener('click', (e)=>{
+    pointerVec.x = (e.clientX/window.innerWidth)*2-1;
+    pointerVec.y = -(e.clientY/window.innerHeight)*2+1;
+    raycaster.setFromCamera(pointerVec, camera);
+    const hits = raycaster.intersectObject(clickTarget);
+    if(hits.length>0) triggerPulse();
+  });
+
+  // ---------- Resize ----------
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- Render loop ----------
+  const clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    core.rotation.y += 0.0022;
+    core.rotation.x += (targetRot.x - core.rotation.x)*0.03;
+    core.rotation.y += (targetRot.y*0.01);
+
+    innerCore.rotation.y -= 0.004;
+    innerCore.rotation.x += 0.0018;
+    const pulse = 1 + Math.sin(t*1.6)*0.06;
+    innerCore.scale.set(pulse,pulse,pulse);
+    centralGlow.material.opacity = 0.75 + Math.sin(t*1.6)*0.15;
+
+    shell.rotation.y -= 0.0016;
+    shell.rotation.z += 0.0009;
+
+    rings.forEach(r=>{
+      r.rotateOnAxis(r.userData.axis, r.userData.speed*0.01);
+    });
+
+    particles.rotation.y += 0.0009;
+    links.rotation.y += 0.0009;
+
+    stars.rotation.y += 0.00015;
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ---------- Intro sequence (GSAP) ----------
+  gsap.set(core.scale, { x:0, y:0, z:0 });
+  const tl = gsap.timeline({ defaults:{ ease:'power3.out' } });
+
+  tl.to(camera.position, { z:9, duration:2.6, ease:'power2.inOut' }, 0)
+    .to(core.scale, { x:1, y:1, z:1, duration:1.8, ease:'elastic.out(1,0.55)' }, 0.4)
+    .to('.bracket', { opacity:1, duration:0.6, stagger:0.08 }, 0.3)
+    .to('.title-block', { opacity:1, duration:0.9 }, 0.9)
+    .to('.panel.left', { opacity:1, duration:0.8 }, 1.3)
+    .to('.panel.right', { opacity:1, duration:0.8 }, 1.5)
+    .to('.hint', { opacity:1, duration:0.8 }, 2.0)
+    .to(['#bar-energia'], { width:'87%', duration:1.2 }, 1.6)
+    .to(['#bar-sincronia'], { width:'63%', duration:1.2 }, 1.8);
+
+  // ---------- Telemetry readouts ----------
+  const valEnergia = document.getElementById('val-energia');
+  const valSincronia = document.getElementById('val-sincronia');
+  const valFreq = document.getElementById('val-freq');
+  const valNos = document.getElementById('val-nos');
+  const valFluxo = document.getElementById('val-fluxo');
+  const valLatencia = document.getElementById('val-latencia');
+
+  const state = { energia:0, sincronia:0 };
+  gsap.to(state, {
+    energia: 87, sincronia: 63, duration:1.6, delay:1.6, ease:'power2.out',
+    onUpdate(){
+      valEnergia.textContent = state.energia.toFixed(1)+'%';
+      valSincronia.textContent = state.sincronia.toFixed(1)+'%';
+    }
+  });
+
+  setInterval(()=>{
+    const e = (85 + Math.random()*7).toFixed(1);
+    const s = (58 + Math.random()*10).toFixed(1);
+    valEnergia.textContent = e+'%';
+    valSincronia.textContent = s+'%';
+    document.getElementById('bar-energia').style.width = e+'%';
+    document.getElementById('bar-sincronia').style.width = s+'%';
+    valFreq.textContent = (2 + Math.random()*3.4).toFixed(2)+' THz';
+    valNos.textContent = String(Math.floor(3200 + Math.random()*900)).padStart(4,'0');
+    valFluxo.textContent = (4 + Math.random()*12).toFixed(1)+' GB/s';
+    valLatencia.textContent = Math.floor(2 + Math.random()*9)+' ms';
+  }, 1400);
+
+})();
+</script>
+</body>
+</html>
