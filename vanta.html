@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulação Vantablack 3D</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #1a1a1a;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      pointer-events: none;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui">
+    <strong>Esquerda:</strong> Material Preto Comum (Reage à luz/sombras)<br>
+    <strong>Direita:</strong> Efeito Vantablack (Absorve luz/Anula profundidade)
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+    // 1. Configuração de Cena, Câmera e Renderizador
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 5;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // 2. Iluminação
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(ambientLight);
+
+    // 3. Geometria complexa para evidenciar relevo
+    const geometry = new THREE.TorusKnotGeometry(0.8, 0.28, 128, 32);
+
+    // 4. Objeto Preto Padrão (MeshStandardMaterial calcula reflexos e sombras)
+    const standardMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x111111, 
+      roughness: 0.3,
+      metalness: 0.1
+    });
+    const standardMesh = new THREE.Mesh(geometry, standardMaterial);
+    standardMesh.position.x = -1.8;
+    scene.add(standardMesh);
+
+    // 5. Objeto Vantablack (MeshBasicMaterial ignora toda luz da cena)
+    const vantablackMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x000000 
+    });
+    const vantablackMesh = new THREE.Mesh(geometry, vantablackMaterial);
+    vantablackMesh.position.x = 1.8;
+    scene.add(vantablackMesh);
+
+    // 6. Loop de Animação
+    function animate() {
+      requestAnimationFrame(animate);
+
+      standardMesh.rotation.x += 0.008;
+      standardMesh.rotation.y += 0.008;
+
+      vantablackMesh.rotation.x += 0.008;
+      vantablackMesh.rotation.y += 0.008;
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Redimensionamento responsivo
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
