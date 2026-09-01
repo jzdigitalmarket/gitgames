@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulação de Colisão Vantablack 3D</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #121212;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+      pointer-events: none;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui">
+    <strong>5 Esferas Cinza Escuro:</strong> Exibem reflexos, volume e sombra no contato.<br>
+    <strong>5 Esferas Vantablack:</strong> Se fundem em uma silhueta contínua ao se cruzarem.
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+    // 1. Configuração de Cena, Câmera e Renderizador
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 7;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // 2. Iluminação
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(ambLight);
+
+    // 3. Materiais
+    const standardMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x222222, 
+      roughness: 0.2, 
+      metalness: 0.1 
+    });
+
+    const vantablackMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x000000 
+    });
+
+    // 4. Criação dos 10 Objetos com Velocidades Iniciais
+    const geometry = new THREE.SphereGeometry(0.4, 32, 32);
+    const radius = 0.4;
+    const spheres = [];
+    const BOUNDS = 2.5;
+
+    for (let i = 0; i < 10; i++) {
+      const isVantablack = i >= 5; // 5 padrão, 5 vantablack
+      const mesh = new THREE.Mesh(geometry, isVantablack ? vantablackMaterial : standardMaterial);
+      
+      mesh.position.set(
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 4
+      );
+
+      scene.add(mesh);
+
+      spheres.push({
+        mesh,
+        radius,
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.04,
+          (Math.random() - 0.5) * 0.04,
+          (Math.random() - 0.5) * 0.04
+        )
+      });
+    }
+
+    // 5. Física de Colisão Esfera-Esfera e Paredes
+    function handleCollisions() {
+      // Movimento e Limites da Caixa
+      spheres.forEach(s => {
+        s.mesh.position.add(s.velocity);
+
+        ['x', 'y', 'z'].forEach(axis => {
+          if (Math.abs(s.mesh.position[axis]) > BOUNDS) {
+            s.mesh.position[axis] = Math.sign(s.mesh.position[axis]) * BOUNDS;
+            s.velocity[axis] *= -1;
+          }
+        });
+      });
+
+      // Choques Entre Esferas
+      for (let i = 0; i < spheres.length; i++) {
+        for (let j = i + 1; j < spheres.length; j++) {
+          const s1 = spheres[i];
+          const s2 = spheres[j];
+
+          const diff = new THREE.Vector3().subVectors(s1.mesh.position, s2.mesh.position);
+          const distance = diff.length();
+          const minDist = s1.radius + s2.radius;
+
+          if (distance < minDist) {
+            const normal = diff.normalize();
+
+            // Correção de sobreposição física
+            const overlap = minDist - distance;
+            s1.mesh.position.addScaledVector(normal, overlap * 0.5);
+            s2.mesh.position.addScaledVector(normal, -overlap * 0.5);
+
+            // Troca de momento vetorial
+            const relativeVelocity = new THREE.Vector3().subVectors(s1.velocity, s2.velocity);
+            const speed = relativeVelocity.dot(normal);
+
+            if (speed < 0) {
+              const impulse = normal.multiplyScalar(speed);
+              s1.velocity.sub(impulse);
+              s2.velocity.add(impulse);
+            }
+          }
+        }
+      }
+    }
+
+    // 6. Loop de Renderização
+    function animate() {
+      requestAnimationFrame(animate);
+      handleCollisions();
+      scene.rotation.y += 0.002; // Rotação sutil da câmera/cena
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
